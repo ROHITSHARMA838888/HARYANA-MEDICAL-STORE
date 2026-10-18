@@ -1,0 +1,38 @@
+{
+  "id": "/",
+  "name": "Haryana Medical Store — Pharmacy POS & Inventory",
+  "short_name": "HaryanaMed",
+  "description": "Offline-first Pharmacy POS, FEFO Inventory, OCR Purchase & GST Billing PWA for Haryana Medical Store, Dhoha, Firozpur Jhirka.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#15803d",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
