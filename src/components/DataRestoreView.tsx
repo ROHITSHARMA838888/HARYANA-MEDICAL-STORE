@@ -475,10 +475,10 @@ export const DataRestoreView: React.FC<DataRestoreViewProps> = ({
           <div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <RotateCcw className="w-5 h-5 text-emerald-700 dark:text-emerald-400" />
-              Data Restoration Center — Inspect & Recover Deleted Items ({deletedItems.length})
+              Data Restoration & Recovery Center — Deleted Items ({deletedItems.length})
             </h2>
             <p className="text-xs text-slate-500">
-              Inspect complete original metadata for each deleted Medicine, Supplier, Customer, or Sales Bill before choosing to restore or permanently delete it
+              Inspect complete original metadata for each deleted Medicine, Supplier, Customer, or Sales Bill and click &ldquo;Recover&rdquo; to restore it immediately
             </p>
           </div>
 
@@ -487,10 +487,10 @@ export const DataRestoreView: React.FC<DataRestoreViewProps> = ({
               <button
                 type="button"
                 onClick={onRestoreAll}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold cursor-pointer shadow-xs"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                Restore All ({deletedItems.length})
+                Recover All Deleted Items ({deletedItems.length})
               </button>
               <button
                 type="button"
@@ -648,10 +648,10 @@ export const DataRestoreView: React.FC<DataRestoreViewProps> = ({
                           <button
                             type="button"
                             onClick={() => onRestoreItem(item)}
-                            aria-label={`Restore ${item.title}`}
+                            aria-label={`Recover ${item.title}`}
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-bold cursor-pointer shadow-2xs"
                           >
-                            <RotateCcw className="w-3 h-3" /> Restore Item
+                            <RotateCcw className="w-3 h-3" /> Recover
                           </button>
                           <button
                             type="button"
@@ -706,7 +706,7 @@ export const DataRestoreView: React.FC<DataRestoreViewProps> = ({
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold shadow-xs cursor-pointer"
               >
                 <RotateCcw className="w-4 h-4" />
-                Restore &ldquo;{inspectedItem.title}&rdquo; Now
+                Recover &ldquo;{inspectedItem.title}&rdquo; Now
               </button>
               <button
                 type="button"
@@ -806,7 +806,7 @@ export const DataRestoreView: React.FC<DataRestoreViewProps> = ({
                 }}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold cursor-pointer"
               >
-                <RotateCcw className="w-3.5 h-3.5" /> Restore to Active Records
+                <RotateCcw className="w-3.5 h-3.5" /> Recover to Active Records
               </button>
             </div>
           </div>

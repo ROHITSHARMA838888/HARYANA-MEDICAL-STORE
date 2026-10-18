@@ -369,9 +369,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               type="button"
               key={item.id}
               onClick={() => onRestoreItem(item)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-700 hover:bg-emerald-600 text-white font-semibold text-[11px] cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] cursor-pointer shadow-xs"
             >
-              <RotateCcw className="w-3 h-3" /> Restore {item.title}
+              <RotateCcw className="w-3 h-3" /> Recover {item.title}
             </button>
           ))}
           <button
@@ -379,7 +379,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             onClick={() => setSubView('deleted')}
             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-900 dark:bg-amber-500 text-white dark:text-slate-950 font-bold text-[11px] cursor-pointer"
           >
-            <RotateCcw className="w-3 h-3" /> View Deleted Medicines ({deletedMedItems.length})
+            <RotateCcw className="w-3 h-3" /> Recover Deleted Medicines ({deletedMedItems.length})
           </button>
         </div>
       </div>
@@ -441,7 +441,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                Deleted / Restore ({deletedMedItems.length})
+                Recover Deleted ({deletedMedItems.length})
               </button>
             </div>
             <button
@@ -803,9 +803,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         <button
                           type="button"
                           onClick={() => onRestoreItem(item)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs cursor-pointer shadow-xs"
                         >
-                          <RotateCcw className="w-3.5 h-3.5" /> Restore Medicine / Batch
+                          <RotateCcw className="w-3.5 h-3.5" /> Recover Medicine / Batch
                         </button>
                       </td>
                     </tr>

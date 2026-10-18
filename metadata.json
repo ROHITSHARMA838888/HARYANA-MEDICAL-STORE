@@ -1,6 +1,10 @@
 {
   "name": "Haryana Medical Store — Pharmacy POS & Inventory PWA",
   "description": "Offline-first Progressive Web App for Haryana Medical Store (Prop. Rahul Sharma, Dhoha, Firozpur Jhirka) featuring FEFO POS billing, batch-wise inventory, OCR purchase entry, GST invoicing, Udhaar ledger, and P&L analytics.",
-  "requestFramePermissions": ["camera"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

@@ -132,9 +132,9 @@ export const BillHistoryView: React.FC<BillHistoryViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onRestoreItem(item)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] whitespace-nowrap shrink-0 cursor-pointer"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] whitespace-nowrap shrink-0 cursor-pointer shadow-xs"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" /> Restore Sale Bill
+                  <RotateCcw className="w-3.5 h-3.5" /> Recover Sale Bill
                 </button>
               </div>
             ))}

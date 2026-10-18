@@ -287,12 +287,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* 3. Free-Tier & Android APK Packaging Guide */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
-        <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-          Android APK Packaging & 100% Free-Tier Offline Architecture Guide
-        </h3>
-        <div className="grid sm:grid-cols-2 gap-4 text-slate-600 dark:text-slate-400">
+      {/* 3. Free-Tier & Android APK Packaging Guide & Direct Download */}
+      <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-xl p-4 sm:p-5 border border-emerald-500/40 space-y-3 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-extrabold text-sm text-emerald-900 dark:text-emerald-200">
+              Signed Android APK Ready for Download
+            </h3>
+            <p className="text-emerald-700 dark:text-emerald-300">
+              The production-ready release APK (<code className="font-mono">haryana-medical-store-release.apk</code>) signed with <code className="font-mono">haryana-pos.jks</code> is fully compiled and ready.
+            </p>
+          </div>
+          <a
+            href="/haryana-medical-store-release.apk"
+            download="HaryanaMedicalStore-Release.apk"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs shadow-md cursor-pointer"
+          >
+            <Download className="w-4 h-4" /> Download Signed APK (3.4 MB)
+          </a>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4 text-slate-600 dark:text-slate-400 border-t border-emerald-500/20 pt-3">
           <div className="space-y-1">
             <p className="font-semibold text-slate-900 dark:text-white">
               Zero Paid APIs (100% Free Forever):

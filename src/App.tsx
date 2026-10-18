@@ -860,7 +860,7 @@ export default function App() {
 
   const DashboardTabs: Array<{ id: TabId; label: string; count?: number }> = [
     { id: 'Sales', label: 'POS Billing' },
-    { id: 'DataRestore', label: 'Data Restore', count: allRecoverableItems.length },
+    { id: 'DataRestore', label: 'Recover Deleted', count: allRecoverableItems.length },
     { id: 'Inventory', label: 'Medicines & Inventory' },
     { id: 'Suppliers', label: 'Suppliers' },
     { id: 'BillHistory', label: 'Bill History' },
@@ -1032,12 +1032,13 @@ export default function App() {
 
             <button
               type="button"
+              data-testid="top-header-restore-btn"
               onClick={() => setActiveTab('DataRestore')}
               aria-label={`Open Data Restoration Center (${allRecoverableItems.length} recoverable items)`}
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-extrabold whitespace-nowrap shrink-0 cursor-pointer shadow-xs"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Restore ({allRecoverableItems.length})</span>
+              <span>Recover Deleted ({allRecoverableItems.length})</span>
             </button>
 
             <button
@@ -1348,6 +1349,13 @@ export default function App() {
             <div className="flex flex-wrap items-center justify-center gap-2 shrink-0">
               <button
                 type="button"
+                onClick={() => setActiveTab('DataRestore')}
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-sm cursor-pointer"
+              >
+                Recover Deleted ({allRecoverableItems.length})
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowWelcomeScreen(true)}
                 className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold cursor-pointer"
               >
@@ -1369,6 +1377,19 @@ export default function App() {
                 <X className="w-4 h-4" />
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Offline Connectivity Status Banner (PWA Cache in Action) */}
+        {!isOnline && (
+          <div className="bg-amber-600 text-white px-4 py-2 rounded-xl shadow-md flex items-center justify-between gap-2 text-xs font-bold border border-amber-400">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
+              <span>
+                Offline Mode Active — PWA Service Worker Cache in effect. All POS billing, medicines, and inventory continue to work offline without network connection.
+              </span>
+            </div>
+            <span className="font-mono text-[10px] bg-black/20 px-2 py-0.5 rounded">SW v2.6.0</span>
           </div>
         )}
 
@@ -1624,7 +1645,7 @@ export default function App() {
             [
               { id: 'Sales', label: 'Sales POS', Icon: ShoppingCart },
               { id: 'Inventory', label: 'Medicines', Icon: Package },
-              { id: 'DataRestore', label: `Restore (${allRecoverableItems.length})`, Icon: RotateCcw },
+              { id: 'DataRestore', label: `Recover (${allRecoverableItems.length})`, Icon: RotateCcw },
               { id: 'Suppliers', label: 'Suppliers', Icon: Truck },
               { id: 'Settings', label: 'Settings', Icon: SettingsIcon },
             ] as const
