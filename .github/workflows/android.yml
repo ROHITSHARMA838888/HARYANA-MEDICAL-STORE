@@ -1,24 +1,51 @@
-name: Android CI/CD
+name: Build APK
+
 on:
-push:
-branches:
-- main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
 jobs:
-build:
-runs-on: ubuntu-latest
-steps:
-- name: Checkout Source
-  uses: actions/checkout@v4
-- name: Setup Java 17
-  uses: actions/setup-java@v4
-  with:
-  distribution: 'temurin'
-  java-version: '17'
-- name: Grant Permission
-  run: chmod +x gradlew
-- name: Build Debug APK
-  run: ./gradlew assembleDebug
-- name: Upload APK
-uses: actions/upload-artifact@v4
-with:
-name: debug-apk
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
+      - name: Build APK with versionCode
+        run: |
+          cd android
+          ./gradlew assembleDebug -PversionCode=${{ github.run_number }} -PversionName=1.0.${{ github.run_number }}
+
+      - name: Create GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          files: android/app/build/outputs/apk/debug/app-debug.apk
