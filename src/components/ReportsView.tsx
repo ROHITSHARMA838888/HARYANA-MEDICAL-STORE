@@ -372,10 +372,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {deadStockMeds.map((m) => (
                   <tr key={m.id}>
-                    <td className="py-2 px-3 font-semibold">{m.name}</td>
-                    <td className="py-2 px-2 text-slate-500">{m.salt}</td>
-                    <td className="py-2 px-2 font-mono">{m.rack}</td>
-                    <td className="py-2 px-3 font-mono text-amber-600">
+                    <td data-label="Medicine" className="py-2 px-3 font-semibold">{m.name}</td>
+                    <td data-label="Salt" className="py-2 px-2 text-slate-500">{m.salt}</td>
+                    <td data-label="Rack" className="py-2 px-2 font-mono">{m.rack}</td>
+                    <td data-label="Last Sold Date" className="py-2 px-3 font-mono text-amber-600">
                       {formatDateDDMMYYYY(m.lastSoldDate)}
                     </td>
                   </tr>

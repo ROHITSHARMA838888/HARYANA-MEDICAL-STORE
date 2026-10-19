@@ -48,6 +48,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     );
   };
 
+  const [ownerNewPass, setOwnerNewPass] = React.useState(settings.ownerPass);
+  const [ownerNewPin, setOwnerNewPin] = React.useState(settings.ownerPin);
+  const [staffNewPass, setStaffNewPass] = React.useState(settings.staffPass);
+  const [staffNewPin, setStaffNewPin] = React.useState(settings.staffPin);
+
+  const handleSaveCredentials = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ownerNewPass.trim() || !staffNewPass.trim()) {
+      showToast('Owner and Staff passwords cannot be empty.', 'error');
+      return;
+    }
+    setSettings((prev) => ({
+      ...prev,
+      ownerPass: ownerNewPass.trim(),
+      ownerPin: ownerNewPin.trim() || '1234',
+      staffPass: staffNewPass.trim(),
+      staffPin: staffNewPin.trim() || '0000',
+    }));
+    showToast('Owner & Staff passwords and PINs securely updated in local encrypted storage!');
+  };
+
   return (
     <div className="space-y-6">
       {/* 1. Shop Identity & Legal Registration Form */}
@@ -208,14 +229,134 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </form>
 
-      {/* 2. Backup, Restore, 3-Image Studio, Updates & Access Control */}
+      {/* 2. Separated Owner & Staff Credential Management & Change Password */}
+      <form
+        onSubmit={handleSaveCredentials}
+        className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 space-y-4 text-xs"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+          <div>
+            <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+              Change Password &amp; Role Credential Management (Owner vs. Staff)
+            </h3>
+            <p className="text-slate-500">
+              Separately manage Owner and Staff login usernames, passwords, and 4-digit security PINs
+            </p>
+          </div>
+          <button
+            type="submit"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-semibold cursor-pointer"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" /> Update Passwords &amp; PINs
+          </button>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* Owner Credentials Box */}
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 space-y-3">
+            <p className="font-bold text-emerald-800 dark:text-emerald-300">
+              Owner Account ({settings.proprietor}) — Full Administrative Access
+            </p>
+            <div className="grid sm:grid-cols-3 gap-2.5">
+              <div>
+                <label htmlFor="cred-owner-user" className="block text-[11px] text-slate-500 mb-1">
+                  Owner Username
+                </label>
+                <input
+                  id="cred-owner-user"
+                  type="text"
+                  value={settings.ownerUser}
+                  onChange={(e) => setSettings((p) => ({ ...p, ownerUser: e.target.value }))}
+                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono"
+                />
+              </div>
+              <div>
+                <label htmlFor="cred-owner-pass" className="block text-[11px] text-slate-500 mb-1">
+                  New Owner Password
+                </label>
+                <input
+                  id="cred-owner-pass"
+                  type="password"
+                  value={ownerNewPass}
+                  onChange={(e) => setOwnerNewPass(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono"
+                />
+              </div>
+              <div>
+                <label htmlFor="cred-owner-pin" className="block text-[11px] text-slate-500 mb-1">
+                  Owner 4-Digit PIN
+                </label>
+                <input
+                  id="cred-owner-pin"
+                  type="password"
+                  maxLength={4}
+                  value={ownerNewPin}
+                  onChange={(e) => setOwnerNewPin(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Staff Credentials Box */}
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 space-y-3">
+            <p className="font-bold text-slate-800 dark:text-slate-200">
+              Pharmacy Staff Account — POS Billing &amp; Stock Entry Only
+            </p>
+            <div className="grid sm:grid-cols-3 gap-2.5">
+              <div>
+                <label htmlFor="cred-staff-user" className="block text-[11px] text-slate-500 mb-1">
+                  Staff Username
+                </label>
+                <input
+                  id="cred-staff-user"
+                  type="text"
+                  value={settings.staffUser}
+                  onChange={(e) => setSettings((p) => ({ ...p, staffUser: e.target.value }))}
+                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono"
+                />
+              </div>
+              <div>
+                <label htmlFor="cred-staff-pass" className="block text-[11px] text-slate-500 mb-1">
+                  New Staff Password
+                </label>
+                <input
+                  id="cred-staff-pass"
+                  type="password"
+                  value={staffNewPass}
+                  onChange={(e) => setStaffNewPass(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono"
+                />
+              </div>
+              <div>
+                <label htmlFor="cred-staff-pin" className="block text-[11px] text-slate-500 mb-1">
+                  Staff 4-Digit PIN
+                </label>
+                <input
+                  id="cred-staff-pin"
+                  type="password"
+                  maxLength={4}
+                  value={staffNewPin}
+                  onChange={(e) => setStaffNewPin(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      {/* 3. Backup, Restore, 3-Image Studio, GitHub Updates & Access Control */}
       <div className="grid md:grid-cols-2 gap-4 text-xs">
         <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 space-y-3">
           <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-            Offline JSON Backup, Restore & App Updates
+            Cloud &amp; Offline JSON Backup, Restore &amp; GitHub Auto-Updater
           </h3>
           <p className="text-slate-500">
-            Last Local Auto-Backup: <span className="font-mono">{settings.lastBackupTime}</span>
+            Last Auto-Backup: <span className="font-mono">{settings.lastBackupTime}</span> · GitHub Repo:{' '}
+            <span className="font-mono text-emerald-700 dark:text-emerald-400">
+              rohitsharma22057/haryana-medical-store
+            </span>
           </p>
           <div className="flex flex-wrap gap-2">
             <button
@@ -239,14 +380,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onClick={triggerUpdateBanner}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 font-semibold cursor-pointer"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> Check for App Updates
+              <RefreshCw className="w-3.5 h-3.5" /> Check GitHub for App Updates
             </button>
           </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 space-y-3">
           <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-            3-Image Reference Studio & Role Access Control
+            3-Image Reference Studio &amp; Role Access Control
           </h3>
           <p className="text-slate-500">
             Active Session Role: <span className="font-bold text-emerald-700">{userRole}</span>
@@ -287,7 +428,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* 3. Free-Tier & Android APK Packaging Guide & Direct Download */}
+      {/* 4. Free-Tier & Android APK Packaging Guide & Direct Download */}
       <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-xl p-4 sm:p-5 border border-emerald-500/40 space-y-3 text-xs">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -313,10 +454,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               Zero Paid APIs (100% Free Forever):
             </p>
             <p>
-              • Database: Offline-first IndexedDB / LocalStorage with 1-click JSON export & restore.
+              • Database: Offline-first IndexedDB / LocalStorage + Cloud Firestore Sync with 1-click JSON export &amp; restore.
             </p>
             <p>
-              • Calls & SMS: Uses native Android/iOS URI schemes (<code className="font-mono">tel:</code>,{' '}
+              • Calls &amp; SMS: Uses native Android/iOS URI schemes (<code className="font-mono">tel:</code>,{' '}
               <code className="font-mono">sms:</code>, <code className="font-mono">mailto:</code>)
               with zero SMS gateway fees.
             </p>

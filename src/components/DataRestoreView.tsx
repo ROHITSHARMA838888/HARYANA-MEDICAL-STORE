@@ -553,14 +553,14 @@ export const DataRestoreView: React.FC<DataRestoreViewProps> = ({
             ))}
           </div>
 
-          <div className="flex items-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 min-w-[240px]">
+          <div className="flex items-center rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 w-full sm:w-auto sm:min-w-[240px] min-w-0">
             <Search className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search deleted items to inspect or restore..."
-              className="w-full bg-transparent text-xs focus:outline-none"
+              className="w-full min-w-0 bg-transparent text-xs focus:outline-none"
             />
           </div>
         </div>
@@ -620,20 +620,21 @@ export const DataRestoreView: React.FC<DataRestoreViewProps> = ({
                           {getTypeLabel(item.entityType)}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">
+                      <td data-label="Deleted Item" className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">
                         {item.title}
                       </td>
-                      <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 font-mono text-[11px]">
+                      <td data-label="Snapshot Summary" className="py-2.5 px-3 text-slate-600 dark:text-slate-300 font-mono text-[11px]">
                         {item.subtitle}
                       </td>
-                      <td className="py-2.5 px-2 font-mono text-slate-500 whitespace-nowrap">
+                      <td data-label="Deleted At" className="py-2.5 px-2 font-mono text-slate-500 whitespace-nowrap">
                         {item.deletedAt}
                       </td>
                       <td
-                        className="py-2.5 px-3 text-right whitespace-nowrap"
+                        data-label="Actions"
+                        className="py-2.5 px-3 text-right"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="inline-flex items-center justify-end gap-1.5">
+                        <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => {

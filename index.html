@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-IN" dir="ltr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
     <title>Haryana Medical Store — Pharmacy POS & Inventory</title>
     <meta name="description" content="Offline-first Pharmacy POS, FEFO Inventory, OCR Purchase & GST Billing PWA for Haryana Medical Store, Dhoha, Firozpur Jhirka." />
     <meta property="og:title" content="Haryana Medical Store — Pharmacy POS & Inventory" />
@@ -15,14 +15,30 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="HaryanaMed" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased selection:bg-emerald-700 selection:text-white">
-    <div id="root"></div>
+    <div id="root">
+      <div class="min-h-screen bg-emerald-950 text-white flex flex-col items-center justify-center p-6 text-center">
+        <div class="w-36 h-36 rounded-full bg-white p-2 border-4 border-amber-400 shadow-2xl flex items-center justify-center overflow-hidden">
+          <img src="/icon.svg" alt="Haryana Medical Store Official Logo" referrerpolicy="no-referrer" class="w-full h-full object-contain rounded-full" />
+        </div>
+        <p class="mt-4 text-2xl sm:text-3xl font-extrabold tracking-tight text-amber-300">
+          Made by Rohit Sharma
+        </p>
+        <h1 class="mt-2 text-xl sm:text-2xl font-bold text-white">
+          Haryana Medical Store
+        </h1>
+        <p class="mt-1 text-xs text-emerald-200">
+          Main Market, Village Dhoha, Firozpur Jhirka, Nuh (Mewat), Haryana - 122104
+        </p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

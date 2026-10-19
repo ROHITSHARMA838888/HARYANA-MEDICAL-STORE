@@ -152,14 +152,14 @@ export const BillHistoryView: React.FC<BillHistoryViewProps> = ({
               Click &ldquo;PDF Invoice&rdquo; to open the built-in viewer, or &ldquo;Edit Bill&rdquo; to modify items in POS
             </p>
           </div>
-          <div className="flex items-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 min-w-[240px]">
+          <div className="flex items-center rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 w-full sm:w-auto sm:min-w-[240px] min-w-0">
             <Search className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by Bill No, Patient, Mobile, or Doctor..."
-              className="w-full bg-transparent text-xs focus:outline-none"
+              className="w-full min-w-0 bg-transparent text-xs focus:outline-none"
             />
           </div>
         </div>
@@ -183,35 +183,35 @@ export const BillHistoryView: React.FC<BillHistoryViewProps> = ({
                   <td className="py-2.5 px-3 font-mono font-bold text-emerald-700 dark:text-emerald-400">
                     {s.id}
                   </td>
-                  <td className="py-2.5 px-2 font-mono text-slate-600 dark:text-slate-400">
+                  <td data-label="Date & Time" className="py-2.5 px-2 font-mono text-slate-600 dark:text-slate-400">
                     {formatDateDDMMYYYY(s.date)} · {s.time}
                   </td>
-                  <td className="py-2.5 px-3">
+                  <td data-label="Customer / Doctor" className="py-2.5 px-3">
                     <p className="font-semibold text-slate-900 dark:text-white">{s.customerName}</p>
                     <p className="text-[11px] text-slate-500">
                       {s.customerMobile} · {s.doctorName}
                     </p>
                   </td>
-                  <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
+                  <td data-label="Medicines Sold" className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
                     {s.items.map((i) => `${i.medicineName} (x${i.qty})`).join(' · ')}
                   </td>
-                  <td className="py-2.5 px-2 font-medium">{s.paymentMode}</td>
-                  <td className="py-2.5 px-2 text-right font-mono font-bold text-slate-900 dark:text-white">
+                  <td data-label="Payment Mode" className="py-2.5 px-2 font-medium">{s.paymentMode}</td>
+                  <td data-label="Grand Total" className="py-2.5 px-2 text-right font-mono font-bold text-slate-900 dark:text-white">
                     {formatINR(s.grandTotal)}
                   </td>
-                  <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                    <div className="inline-flex items-center gap-1.5">
+                  <td data-label="Actions" className="py-2.5 px-3 text-right">
+                    <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                       <button
                         type="button"
                         onClick={() => setInvoiceModalSale(s)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-semibold cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-semibold cursor-pointer"
                       >
                         <FileText className="w-3 h-3" /> PDF Invoice
                       </button>
                       <button
                         type="button"
                         onClick={() => onEditSaleInPOS(s)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-[11px] font-medium cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-[11px] font-medium cursor-pointer"
                       >
                         <Edit3 className="w-3 h-3" /> Edit Bill
                       </button>
@@ -220,7 +220,7 @@ export const BillHistoryView: React.FC<BillHistoryViewProps> = ({
                           type="button"
                           onClick={() => handleDeleteSale(s)}
                           aria-label={`Delete Bill ${s.id}`}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-50 dark:bg-red-950/50 hover:bg-red-100 text-red-600 dark:text-red-400 text-[11px] font-semibold cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/50 hover:bg-red-100 text-red-600 dark:text-red-400 text-[11px] font-semibold cursor-pointer"
                         >
                           <Trash2 className="w-3 h-3" /> Delete
                         </button>

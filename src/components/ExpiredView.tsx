@@ -137,21 +137,21 @@ export const ExpiredView: React.FC<ExpiredViewProps> = ({
               ) : (
                 expiredList.map((b) => (
                   <tr key={b.id}>
-                    <td className="py-2.5 px-3 font-semibold text-slate-900 dark:text-white">
+                    <td data-label="Medicine" className="py-2.5 px-3 font-semibold text-slate-900 dark:text-white">
                       {b.medName}
                     </td>
-                    <td className="py-2.5 px-2 font-mono">
+                    <td data-label="Batch & Rack" className="py-2.5 px-2 font-mono">
                       {b.batchNo} · Rack {b.rack}
                     </td>
-                    <td className="py-2.5 px-2 font-mono text-red-600 font-bold">
+                    <td data-label="Expired On" className="py-2.5 px-2 font-mono text-red-600 font-bold">
                       {formatDateDDMMYYYY(b.expiryDate)} ({Math.abs(b.days)}d ago)
                     </td>
-                    <td className="py-2.5 px-2">{b.supName}</td>
-                    <td className="py-2.5 px-2 text-right font-mono font-bold">{b.quantity}</td>
-                    <td className="py-2.5 px-2 text-right font-mono font-bold text-red-600">
+                    <td data-label="Supplier" className="py-2.5 px-2">{b.supName}</td>
+                    <td data-label="Qty" className="py-2.5 px-2 text-right font-mono font-bold">{b.quantity}</td>
+                    <td data-label="Loss Value (Cost)" className="py-2.5 px-2 text-right font-mono font-bold text-red-600">
                       {formatINR(b.costValue)}
                     </td>
-                    <td className="py-2.5 px-3 text-right">
+                    <td data-label="Actions" className="py-2.5 px-3 text-right">
                       <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                         <button
                           type="button"
@@ -223,16 +223,16 @@ export const ExpiredView: React.FC<ExpiredViewProps> = ({
               ) : (
                 expiringSoonList.map((b) => (
                   <tr key={b.id}>
-                    <td className="py-2.5 px-3 font-semibold">{b.medName}</td>
-                    <td className="py-2.5 px-2 font-mono">
+                    <td data-label="Medicine" className="py-2.5 px-3 font-semibold">{b.medName}</td>
+                    <td data-label="Batch & Rack" className="py-2.5 px-2 font-mono">
                       {b.batchNo} · Rack {b.rack}
                     </td>
-                    <td className="py-2.5 px-2 font-mono text-amber-600 font-bold">
+                    <td data-label="Expiry Date" className="py-2.5 px-2 font-mono text-amber-600 font-bold">
                       {formatDateDDMMYYYY(b.expiryDate)} ({b.days}d left)
                     </td>
-                    <td className="py-2.5 px-2">{b.supName}</td>
-                    <td className="py-2.5 px-2 text-right font-mono font-bold">{b.quantity}</td>
-                    <td className="py-2.5 px-3 text-right">
+                    <td data-label="Supplier" className="py-2.5 px-2">{b.supName}</td>
+                    <td data-label="Stock Qty" className="py-2.5 px-2 text-right font-mono font-bold">{b.quantity}</td>
+                    <td data-label="Actions" className="py-2.5 px-3 text-right">
                       <div className="inline-flex items-center gap-1.5">
                         <button
                           type="button"

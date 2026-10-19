@@ -473,7 +473,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
           <p className="font-semibold text-slate-700 dark:text-slate-300">
             Add Medicine Batch to Purchase Bill
           </p>
-          <div className="grid sm:grid-cols-7 gap-2.5 items-end">
+          <div className="grid sm:grid-cols-8 gap-2.5 items-end">
             <div className="sm:col-span-2">
               <label htmlFor="pur-med-name" className="block text-[11px] text-slate-500 mb-1">
                 Medicine Name (Auto-suggests existing)
@@ -545,6 +545,23 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                 onChange={(e) => setRate(Number(e.target.value || 0))}
                 className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono"
               />
+            </div>
+            <div>
+              <label htmlFor="pur-gst" className="block text-[11px] text-emerald-700 dark:text-emerald-400 font-bold mb-1">
+                GST %
+              </label>
+              <select
+                id="pur-gst"
+                value={gst}
+                onChange={(e) => setGst(Number(e.target.value))}
+                className="w-full px-2.5 py-1.5 rounded border border-emerald-500/60 bg-white dark:bg-slate-900 font-mono font-bold"
+              >
+                <option value={0}>0% (GST Free)</option>
+                <option value={5}>5% GST</option>
+                <option value={12}>12% GST</option>
+                <option value={18}>18% GST</option>
+                <option value={28}>28% GST</option>
+              </select>
             </div>
             <div>
               <label htmlFor="pur-mrp" className="block text-[11px] text-slate-500 mb-1">
@@ -621,19 +638,19 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                 items.map((it, i) => (
                   <tr key={it.batchId}>
                     <td className="py-2 px-3 font-sans font-semibold">{it.medicineName}</td>
-                    <td className="py-2 px-2">{it.batchNo}</td>
-                    <td className="py-2 px-2">{formatDateDDMMYYYY(it.expiryDate)}</td>
-                    <td className="py-2 px-2 text-right">{it.qty}</td>
-                    <td className="py-2 px-2 text-right">{formatINR(it.rate)}</td>
-                    <td className="py-2 px-2 text-right">{formatINR(it.mrp)}</td>
-                    <td className="py-2 px-2 text-right">{it.gst}%</td>
-                    <td className="py-2 px-3 text-right font-bold">{formatINR(it.total)}</td>
-                    <td className="py-2 px-2 text-center">
+                    <td data-label="Batch No" className="py-2 px-2">{it.batchNo}</td>
+                    <td data-label="Expiry" className="py-2 px-2">{formatDateDDMMYYYY(it.expiryDate)}</td>
+                    <td data-label="Quantity" className="py-2 px-2 text-right">{it.qty}</td>
+                    <td data-label="Pur. Rate" className="py-2 px-2 text-right">{formatINR(it.rate)}</td>
+                    <td data-label="MRP" className="py-2 px-2 text-right">{formatINR(it.mrp)}</td>
+                    <td data-label="GST %" className="py-2 px-2 text-right">{it.gst}%</td>
+                    <td data-label="Line Total" className="py-2 px-3 text-right font-bold">{formatINR(it.total)}</td>
+                    <td data-label="Action" className="py-2 px-2 text-center">
                       <button
                         type="button"
                         onClick={() => setItems(items.filter((_, idx) => idx !== i))}
                         aria-label={`Remove ${it.medicineName}`}
-                        className="text-red-600"
+                        className="text-red-600 p-1"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -687,26 +704,26 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                 return (
                   <tr key={p.id}>
                     <td className="py-2.5 px-3 font-mono font-semibold">{p.invoiceNo}</td>
-                    <td className="py-2.5 px-3 font-semibold">{p.supplierName}</td>
-                    <td className="py-2.5 px-2 font-mono">{formatDateDDMMYYYY(p.date)}</td>
-                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-400">
+                    <td data-label="Supplier" className="py-2.5 px-3 font-semibold">{p.supplierName}</td>
+                    <td data-label="Date" className="py-2.5 px-2 font-mono">{formatDateDDMMYYYY(p.date)}</td>
+                    <td data-label="Batches Received" className="py-2.5 px-2 text-slate-600 dark:text-slate-400">
                       {p.items.map((i) => `${i.medicineName} (${i.batchNo})`).join(' · ')}
                     </td>
-                    <td className="py-2.5 px-2 text-right font-mono font-bold">
+                    <td data-label="Grand Total" className="py-2.5 px-2 text-right font-mono font-bold">
                       {formatINR(p.grandTotal)}
                     </td>
-                    <td className="py-2.5 px-2 text-right font-mono">
+                    <td data-label="Balance Due" className="py-2.5 px-2 text-right font-mono">
                       {due > 0 ? (
                         <span className="text-amber-600 font-bold">{formatINR(due)}</span>
                       ) : (
                         <span className="text-emerald-700 dark:text-emerald-400">Paid</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-right">
+                    <td data-label="Contact" className="py-2.5 px-3 text-right">
                       <div className="inline-flex items-center gap-1.5">
                         <a
                           href={`tel:${p.supplierMobile}`}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 text-[11px] font-medium"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 text-[11px] font-medium"
                         >
                           <Phone className="w-3 h-3" /> Call
                         </a>
@@ -716,7 +733,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                               p.date
                             )}.`
                           )}`}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 text-[11px] font-medium"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 text-[11px] font-medium"
                         >
                           <MessageSquare className="w-3 h-3" /> SMS
                         </a>

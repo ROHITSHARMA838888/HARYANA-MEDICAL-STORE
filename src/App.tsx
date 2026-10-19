@@ -62,6 +62,8 @@ import { BillHistoryView } from './components/BillHistoryView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
 import { DataRestoreView } from './components/DataRestoreView';
+import { SplashScreen } from './components/SplashScreen';
+import { syncCloudBackup } from './utils/firebaseSync';
 
 function usePersistentState<T>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [state, setState] = useState<T>(() => {
@@ -149,8 +151,18 @@ export default function App() {
     []
   );
 
-  // Full-screen Welcome Splash (accessible anytime) & Top Welcome Banner on launch
-  const [showWelcomeScreen, setShowWelcomeScreen] = useState(false);
+  // Dedicated Animated Splash Screen -> Welcome Screen -> POS Dashboard Flow
+  const isAutoStart =
+    typeof window !== 'undefined' &&
+    (window.location.search.includes('autostart=1') ||
+      window.location.search.includes('shortcut=1') ||
+      window.location.search.includes('tab=') ||
+      window.location.search.includes('share_text=') ||
+      window.location.search.includes('share_title=') ||
+      window.location.search.includes('lookup=') ||
+      window.location.search.includes('action=import-backup'));
+  const [showSplashScreen, setShowSplashScreen] = useState(!isAutoStart);
+  const [showWelcomeScreen, setShowWelcomeScreen] = useState(!isAutoStart);
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(true);
 
   // Session & Authentication State
@@ -174,8 +186,28 @@ export default function App() {
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [securityAnsInput, setSecurityAnsInput] = useState('');
 
-  // Navigation & Modal State (Navigated to Data Restoration Center)
-  const [activeTab, setActiveTab] = useState<TabId>('DataRestore');
+  // Navigation & Modal State (Defaults to clean POS Billing view or shortcut ?tab= parameter)
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    if (typeof window === 'undefined') return 'Sales';
+    const params = new URLSearchParams(window.location.search);
+    const requestedTab = params.get('tab') as TabId | null;
+    const validTabs: TabId[] = [
+      'Sales',
+      'Purchases',
+      'Inventory',
+      'Expired',
+      'Suppliers',
+      'SupplierHistory',
+      'BillHistory',
+      'Customers',
+      'DataRestore',
+      'Reports',
+      'Alerts',
+      'Settings',
+      'Profile',
+    ];
+    return requestedTab && validTabs.includes(requestedTab) ? requestedTab : 'Sales';
+  });
   const [editingSale, setEditingSale] = useState<SaleRecord | null>(null);
   const [sideDrawerOpen, setSideDrawerOpen] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
@@ -607,7 +639,16 @@ export default function App() {
       ...p,
       lastBackupTime: new Date().toLocaleString('en-IN'),
     }));
-    showToast('Complete Pharmacy Database exported as JSON backup!');
+    void syncCloudBackup({
+      settings,
+      medicines,
+      batches,
+      suppliers,
+      customers,
+      sales,
+      purchases,
+    });
+    showToast('Complete Pharmacy Database exported as JSON backup & synced to Cloud!');
   };
 
   const handleImportJSONBackup = (file: File | undefined) => {
@@ -632,6 +673,117 @@ export default function App() {
     };
     reader.readAsText(file);
   };
+
+  // Handle PWA Web Share Target, Custom Protocol Handler (web+haryanamed://), File Handling API, & SW Updates
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const processUrlParams = (urlString: string) => {
+      try {
+        const url = new URL(urlString, window.location.origin);
+        const params = url.searchParams;
+
+        // 1. Shortcuts / Tab navigation
+        const tabParam = params.get('tab') as TabId | null;
+        if (tabParam) {
+          setShowSplashScreen(false);
+          setShowWelcomeScreen(false);
+          setActiveTab(tabParam);
+        }
+
+        // 2. Web Share Target (GET ?share_title=...&share_text=...&share_url=...)
+        const sharedText = (
+          params.get('share_text') ||
+          params.get('share_title') ||
+          params.get('share_url') ||
+          ''
+        )
+          .replace(/[<>]/g, '')
+          .trim()
+          .slice(0, 120);
+
+        if (sharedText) {
+          setShowSplashScreen(false);
+          setShowWelcomeScreen(false);
+          setGlobalSearchQuery(sharedText);
+          setGlobalSearchOpen(true);
+          showToast(`Received shared inquiry: "${sharedText}"`, 'info');
+        }
+
+        // 3. Protocol Handler (web+haryanamed://... -> /?lookup=%s)
+        const rawLookup = params.get('lookup');
+        if (rawLookup) {
+          const cleaned = decodeURIComponent(rawLookup)
+            .replace(/^web\+haryanamed:\/\/?/i, '')
+            .replace(/[<>]/g, '')
+            .trim()
+            .slice(0, 100);
+          if (cleaned) {
+            setShowSplashScreen(false);
+            setShowWelcomeScreen(false);
+            const matchedSale = sales.find(
+              (s) => s.id.toLowerCase() === cleaned.replace(/^bill\//i, '').toLowerCase()
+            );
+            if (matchedSale) {
+              setInvoiceModalSale(matchedSale);
+              showToast(`Opened Bill ${matchedSale.id} via protocol link`);
+            } else {
+              setGlobalSearchQuery(cleaned.replace(/^(search|medicine)\//i, ''));
+              setGlobalSearchOpen(true);
+              showToast(`Searching "${cleaned}" from protocol link`, 'info');
+            }
+          }
+        }
+      } catch {
+        // Ignore malformed launch URLs
+      }
+    };
+
+    processUrlParams(window.location.href);
+
+    // 4. Chromium File Handling API & Launch Handler Queue (window.launchQueue)
+    const winWithLaunchQueue = window as unknown as {
+      launchQueue?: {
+        setConsumer: (
+          callback: (launchParams: {
+            targetURL?: string;
+            files?: Array<{ getFile: () => Promise<File> }>;
+          }) => void
+        ) => void;
+      };
+    };
+
+    if (winWithLaunchQueue.launchQueue && typeof winWithLaunchQueue.launchQueue.setConsumer === 'function') {
+      winWithLaunchQueue.launchQueue.setConsumer(async (launchParams) => {
+        if (launchParams.targetURL) {
+          processUrlParams(launchParams.targetURL);
+        }
+        if (launchParams.files && launchParams.files.length > 0) {
+          try {
+            const fileHandle = launchParams.files[0];
+            const file = await fileHandle.getFile();
+            if (file && file.name.toLowerCase().endsWith('.json')) {
+              setShowSplashScreen(false);
+              setShowWelcomeScreen(false);
+              handleImportJSONBackup(file);
+            }
+          } catch {
+            showToast('Could not read the launched backup file.', 'error');
+          }
+        }
+      });
+    }
+
+    // 5. Service Worker Update Notification Listener
+    const handleSwUpdate = () => {
+      setUpdateState((prev) => ({ ...prev, available: true }));
+    };
+    window.addEventListener('pwa-update-available', handleSwUpdate);
+    return () => {
+      window.removeEventListener('pwa-update-available', handleSwUpdate);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Login Handler
   const handleLoginSubmit = (e: React.FormEvent) => {
@@ -662,6 +814,21 @@ export default function App() {
       }
     }
   };
+
+  // 1. Dedicated Animated Splash Screen on Application Launch (always shown first on launch)
+  if (showSplashScreen) {
+    return (
+      <SplashScreen
+        settings={settings}
+        onComplete={() => setShowSplashScreen(false)}
+        onSkipToPOS={() => {
+          setShowSplashScreen(false);
+          setShowWelcomeScreen(false);
+          setActiveTab('Sales');
+        }}
+      />
+    );
+  }
 
   if (!currentUser.loggedIn) {
     return (
@@ -873,7 +1040,7 @@ export default function App() {
     { id: 'Settings', label: 'Settings' },
   ];
 
-  // Welcome Screen displayed when the app opens
+  // 2. Welcome Screen displayed after Splash Screen completes
   if (showWelcomeScreen) {
     return (
       <div
@@ -904,9 +1071,9 @@ export default function App() {
 
           {/* Pharmacy Store Identity */}
           <div className="space-y-1.5">
-            <span className="inline-block px-3 py-1 rounded-full bg-emerald-800/90 border border-emerald-500/40 text-[11px] font-bold uppercase tracking-widest text-emerald-200">
-              Complete Offline-First Pharmacy POS & Inventory System
-            </span>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-300">
+              Complete Offline-First Pharmacy POS &amp; Inventory System
+            </p>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
               {settings.shopName}
             </h1>
@@ -951,7 +1118,14 @@ export default function App() {
             >
               Enter Pharmacy POS & Dashboard
             </button>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSplashScreen(true)}
+                className="py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-emerald-200 font-semibold text-xs transition cursor-pointer"
+              >
+                Replay Splash
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -980,17 +1154,17 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col pb-20 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-      {/* Top Bar: Left Shop Logo, Center Shop Name, Right Alert Badge + Three-Dot Menu */}
-      <header className="sticky top-0 z-30 bg-emerald-800 text-white shadow-xs">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-3">
-          {/* Left Corner: Shop Logo */}
-          <div className="flex items-center gap-2.5 shrink-0">
+    <div className="min-h-dvh w-full max-w-full overflow-x-hidden flex flex-col pb-24 bg-[#f4f7f5] dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      {/* Android Material Design 3 Sticky Top App Bar */}
+      <header className="sticky top-0 z-30 bg-emerald-800 dark:bg-emerald-950 text-white shadow-md border-b border-emerald-700/60">
+        <div className="max-w-7xl mx-auto px-2.5 sm:px-4 py-2 flex items-center justify-between gap-1.5 sm:gap-2">
+          {/* Left: Shop Emblem Logo & Active Title */}
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <button
               type="button"
               onClick={() => setImageStudioOpen(true)}
               aria-label="Open 3-Image Brand Studio"
-              className="w-10 h-10 rounded-full bg-white p-0.5 border border-amber-400 flex items-center justify-center overflow-hidden shrink-0 cursor-pointer"
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white p-0.5 border-2 border-amber-400 flex items-center justify-center overflow-hidden shrink-0 cursor-pointer shadow-xs active:scale-95 transition"
             >
               <img
                 src={settings.logoDataUrl || UPLOADED_HARYANA_LOGO}
@@ -999,31 +1173,31 @@ export default function App() {
                 className="w-full h-full object-contain rounded-full"
               />
             </button>
-            <span className="hidden sm:inline-block text-xs font-medium text-emerald-100 whitespace-nowrap">
-              {currentUser.role} Mode
-            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-[13px] sm:text-base md:text-lg font-extrabold tracking-tight leading-tight">
+                  {settings.shopName}
+                </h1>
+                <span className="hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-900/90 text-amber-300 shrink-0">
+                  {currentUser.role}
+                </span>
+              </div>
+              <p className="text-[10px] sm:text-[11px] text-emerald-100/95 truncate">
+                Prop: {settings.proprietor} · Dhoha
+                {!isOnline && ' · Offline'}
+                {settings.gstin ? ` · GSTIN: ${settings.gstin}` : ''}
+                {settings.drugLicence ? ` · D.L.: ${settings.drugLicence}` : ''}
+              </p>
+            </div>
           </div>
 
-          {/* Center: Shop Name & Dynamic Legal Registration */}
-          <div className="text-center flex-1 min-w-0">
-            <h1 className="text-base sm:text-lg font-extrabold tracking-tight truncate">
-              {settings.shopName}
-            </h1>
-            <p className="text-[11px] text-emerald-100 truncate">
-              Prop: {settings.proprietor} · Dhoha, Firozpur Jhirka
-              {!isOnline && ' · Offline Mode Active'}
-              {settings.gstin ? ` · GSTIN: ${settings.gstin}` : ''}
-              {settings.drugLicence ? ` · D.L.: ${settings.drugLicence}` : ''}
-            </p>
-          </div>
-
-          {/* Right Corner: PWA Install Button + Small Red Alert Badge + Three-Dot Menu */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          {/* Right: Android M3 Touch-Friendly Action Targets */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {!isInstalled && (isInstallable || isIOS) && (
               <button
                 type="button"
                 onClick={() => (isIOS ? setShowIOSInstallGuide(true) : install())}
-                className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer"
+                className="hidden md:inline-flex items-center gap-1.5 min-h-[40px] px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
                 Install App
@@ -1035,16 +1209,17 @@ export default function App() {
               data-testid="top-header-restore-btn"
               onClick={() => setActiveTab('DataRestore')}
               aria-label={`Open Data Restoration Center (${allRecoverableItems.length} recoverable items)`}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-extrabold whitespace-nowrap shrink-0 cursor-pointer shadow-xs"
+              className="inline-flex items-center justify-center gap-1 min-h-[40px] px-2 sm:px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] sm:text-xs font-extrabold whitespace-nowrap shrink-0 cursor-pointer shadow-xs active:scale-95 transition"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Recover Deleted ({allRecoverableItems.length})</span>
+              <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Recover Deleted ({allRecoverableItems.length})</span>
+              <span className="sm:hidden font-mono">({allRecoverableItems.length})</span>
             </button>
 
             <button
               type="button"
               onClick={() => setImageStudioOpen(true)}
-              className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer"
+              className="hidden lg:inline-flex items-center gap-1.5 min-h-[40px] px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer"
             >
               <ImageIcon className="w-3.5 h-3.5" />
               3-Image Setup
@@ -1054,7 +1229,7 @@ export default function App() {
               type="button"
               onClick={() => setAlertModalOpen(true)}
               aria-label={`Stock and Expiry Alerts (${alertSummary.totalCount})`}
-              className="relative p-2 rounded-lg bg-white/10 hover:bg-white/20 transition cursor-pointer"
+              className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition cursor-pointer active:scale-95"
             >
               <Bell className="w-4 h-4" />
               {alertSummary.totalCount > 0 && (
@@ -1068,19 +1243,19 @@ export default function App() {
               type="button"
               onClick={() => setSideDrawerOpen(true)}
               aria-label="Open Full Menu"
-              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition cursor-pointer"
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition cursor-pointer active:scale-95"
             >
               <MoreVertical className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Universal Global Search Bar */}
-        <div className="bg-emerald-900/90 px-3 sm:px-4 py-1.5 border-t border-white/10">
-          <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center gap-2">
-            <div className="relative lg:w-96 shrink-0">
-              <div className="flex items-center bg-white dark:bg-slate-900 rounded-lg px-3 py-1 text-slate-800 dark:text-slate-100">
-                <Search className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
+        {/* Android M3 Search Bar Row */}
+        <div className="bg-emerald-900/95 dark:bg-slate-900/95 px-3 sm:px-4 py-2 border-t border-white/10">
+          <div className="max-w-7xl mx-auto">
+            <div className="relative w-full">
+              <div className="flex items-center min-h-[42px] bg-white dark:bg-slate-800 rounded-2xl px-3.5 py-1.5 text-slate-800 dark:text-slate-100 shadow-inner">
+                <Search className="w-4 h-4 text-emerald-700 dark:text-emerald-400 mr-2.5 shrink-0" />
                 <input
                   type="text"
                   aria-label="Universal Global Search"
@@ -1090,8 +1265,8 @@ export default function App() {
                     setGlobalSearchQuery(e.target.value);
                     setGlobalSearchOpen(true);
                   }}
-                  placeholder="Universal Search: Medicine, Salt, Customer, Supplier, Bill No..."
-                  className="w-full bg-transparent text-xs focus:outline-none"
+                  placeholder="Search Medicine, Salt, Customer, Supplier, Bill No..."
+                  className="w-full min-w-0 bg-transparent text-xs sm:text-sm focus:outline-none"
                 />
                 {globalSearchQuery && (
                   <button
@@ -1101,22 +1276,22 @@ export default function App() {
                       setGlobalSearchOpen(false);
                     }}
                     aria-label="Clear Global Search"
-                    className="text-xs text-slate-400 hover:text-slate-600 px-1"
+                    className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
-                    ✕
+                    <X className="w-4 h-4" />
                   </button>
                 )}
               </div>
 
               {/* Grouped Global Search Dropdown */}
               {globalSearchOpen && globalSearchResults && (
-                <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 max-h-80 overflow-y-auto z-50 p-3 space-y-2.5 text-xs">
-                  <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-1">
+                <div className="absolute left-0 right-0 mt-1.5 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-h-80 overflow-y-auto z-50 p-3.5 space-y-2.5 text-xs">
+                  <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-1.5">
                     <span className="font-semibold text-slate-500">Global Search Results</span>
                     <button
                       type="button"
                       onClick={() => setGlobalSearchOpen(false)}
-                      className="text-red-600 font-semibold"
+                      className="text-red-600 font-semibold px-2 py-1"
                     >
                       Close
                     </button>
@@ -1135,12 +1310,12 @@ export default function App() {
                             setActiveTab('Inventory');
                             setGlobalSearchOpen(false);
                           }}
-                          className="w-full text-left p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded flex justify-between"
+                          className="w-full text-left p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl flex justify-between gap-2"
                         >
-                          <span>
+                          <span className="min-w-0 truncate">
                             <span className="font-semibold">{m.name}</span> ({m.salt})
                           </span>
-                          <span className="font-mono text-slate-500">Rack {m.rack}</span>
+                          <span className="font-mono text-slate-500 shrink-0">Rack {m.rack}</span>
                         </button>
                       ))}
                     </div>
@@ -1159,12 +1334,12 @@ export default function App() {
                             setActiveTab('Customers');
                             setGlobalSearchOpen(false);
                           }}
-                          className="w-full text-left p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded flex justify-between"
+                          className="w-full text-left p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl flex justify-between gap-2"
                         >
-                          <span>
+                          <span className="min-w-0 truncate">
                             <span className="font-semibold">{c.name}</span> ({c.mobile})
                           </span>
-                          <span className="font-mono text-amber-600">
+                          <span className="font-mono text-amber-600 shrink-0">
                             Udhaar: {formatINR(c.udhaarBalance)}
                           </span>
                         </button>
@@ -1185,10 +1360,10 @@ export default function App() {
                             setActiveTab('Suppliers');
                             setGlobalSearchOpen(false);
                           }}
-                          className="w-full text-left p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded flex justify-between"
+                          className="w-full text-left p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl flex justify-between gap-2"
                         >
-                          <span className="font-semibold">{s.name}</span>
-                          <span className="font-mono text-slate-500">{s.phone}</span>
+                          <span className="font-semibold truncate">{s.name}</span>
+                          <span className="font-mono text-slate-500 shrink-0">{s.phone}</span>
                         </button>
                       ))}
                     </div>
@@ -1207,12 +1382,12 @@ export default function App() {
                             setInvoiceModalSale(s);
                             setGlobalSearchOpen(false);
                           }}
-                          className="w-full text-left p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded flex justify-between"
+                          className="w-full text-left p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl flex justify-between gap-2"
                         >
-                          <span>
+                          <span className="min-w-0 truncate">
                             <span className="font-mono font-bold">{s.id}</span> — {s.customerName}
                           </span>
-                          <span className="font-mono font-semibold">{formatINR(s.grandTotal)}</span>
+                          <span className="font-mono font-semibold shrink-0">{formatINR(s.grandTotal)}</span>
                         </button>
                       ))}
                     </div>
@@ -1220,39 +1395,13 @@ export default function App() {
                 </div>
               )}
             </div>
-
-            {/* Horizontal Navigation Bar */}
-            <nav
-              aria-label="Dashboard Modules"
-              className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-1"
-            >
-              {DashboardTabs.map((tab) => (
-                <button
-                  type="button"
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap shrink-0 transition cursor-pointer ${
-                    activeTab === tab.id
-                      ? 'bg-white text-emerald-900 font-bold shadow-xs'
-                      : 'text-emerald-100 hover:bg-white/10'
-                  }`}
-                >
-                  {tab.label}
-                  {tab.count !== undefined && tab.count > 0 && (
-                    <span className="ml-1.5 font-mono font-bold text-amber-300">
-                      ({tab.count})
-                    </span>
-                  )}
-                </button>
-              ))}
-            </nav>
           </div>
         </div>
       </header>
 
       {/* In-App Update Banner (Never force-updates silently) */}
       {updateState.available && (
-        <div className="bg-amber-500 text-slate-950 px-4 py-2 shadow-xs">
+        <div className="bg-amber-500 text-slate-950 px-4 py-2.5 shadow-xs">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
             <span>
               New App Version v{updateState.version} is ready for {settings.shopName}. Active
@@ -1274,7 +1423,7 @@ export default function App() {
                       800
                     );
                   }}
-                  className="px-3 py-1 rounded bg-slate-900 text-white font-bold cursor-pointer"
+                  className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-slate-900 text-white font-bold cursor-pointer"
                 >
                   {updateState.downloading ? 'Downloading...' : 'Download'}
                 </button>
@@ -1290,7 +1439,7 @@ export default function App() {
                     });
                     showToast('App Update v2.5.0 Installed Successfully!');
                   }}
-                  className="px-3 py-1 rounded bg-emerald-800 text-white font-bold cursor-pointer"
+                  className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-emerald-800 text-white font-bold cursor-pointer"
                 >
                   Install Now
                 </button>
@@ -1298,7 +1447,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setUpdateState((p) => ({ ...p, available: false }))}
-                className="px-3 py-1 rounded bg-white/70 text-slate-900 font-bold cursor-pointer"
+                className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-white/70 text-slate-900 font-bold cursor-pointer"
               >
                 Later
               </button>
@@ -1307,15 +1456,45 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 space-y-4">
+      {/* Main Content Area — Mobile-First Android Container */}
+      <main className="flex-1 max-w-7xl w-full min-w-0 mx-auto px-3 py-3 sm:p-5 space-y-3.5">
+        {/* Android Material 3 Non-Scrolling Module Grid (Zero Horizontal Overflow) */}
+        <nav
+          aria-label="Dashboard Modules"
+          className="bg-white dark:bg-slate-900 rounded-2xl p-2 sm:p-2.5 border border-slate-200/90 dark:border-slate-800 shadow-2xs grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:flex lg:flex-wrap items-center gap-1.5"
+        >
+          {DashboardTabs.map((tab) => (
+            <button
+              type="button"
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`min-h-[42px] px-1.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold leading-tight text-center flex flex-wrap items-center justify-center gap-0.5 sm:gap-1 transition cursor-pointer active:scale-98 ${
+                activeTab === tab.id
+                  ? 'bg-emerald-700 text-white font-bold shadow-xs'
+                  : 'bg-slate-100/80 dark:bg-slate-800/70 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              <span>{tab.label}</span>
+              {tab.count !== undefined && tab.count > 0 && (
+                <span
+                  className={`font-mono text-[10px] font-extrabold shrink-0 ${
+                    activeTab === tab.id ? 'text-amber-300' : 'text-emerald-700 dark:text-emerald-400'
+                  }`}
+                >
+                  ({tab.count})
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+
         {/* Welcome Hero Card with Official Logo and Prominent Bold 'Made by Rohit Sharma' Underneath */}
         {showWelcomeBanner && (
           <div
             data-testid="welcome-banner"
-            className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-slate-900 text-white rounded-2xl p-4 sm:p-5 border border-emerald-700/60 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4"
+            className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-slate-900 text-white rounded-3xl p-4 sm:p-5 border border-emerald-700/60 shadow-md flex flex-col lg:flex-row items-center justify-between gap-4"
           >
-            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+            <div className="flex flex-col sm:flex-row items-center gap-3.5 text-center sm:text-left min-w-0 w-full lg:w-auto">
               <div className="flex flex-col items-center shrink-0">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white p-1.5 border-2 border-amber-400 shadow-lg flex items-center justify-center overflow-hidden">
                   <img
@@ -1327,17 +1506,17 @@ export default function App() {
                 </div>
                 <p
                   data-testid="welcome-creator-credit"
-                  className="mt-2 text-base sm:text-lg font-black tracking-tight text-amber-300 whitespace-nowrap"
+                  className="mt-1.5 text-sm sm:text-base font-black tracking-tight text-amber-300"
                 >
                   Made by Rohit Sharma
                 </p>
               </div>
-              <div className="space-y-1">
-                <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-800/90 border border-emerald-500/40 text-[10px] font-bold uppercase tracking-wider text-emerald-200">
+              <div className="space-y-1 min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-300">
                   Welcome to {settings.shopName}
-                </span>
-                <h2 className="text-lg sm:text-xl font-black tracking-tight text-white">
-                  {settings.shopName} — Pharmacy POS & Data Restoration Center
+                </p>
+                <h2 className="text-base sm:text-xl font-black tracking-tight text-white">
+                  {settings.shopName} — Pharmacy POS &amp; Data Restoration Center
                 </h2>
                 <p className="text-xs text-emerald-100">
                   Proprietor: <strong>{settings.proprietor}</strong> · {settings.address} · Phone:{' '}
@@ -1346,50 +1525,59 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-2 shrink-0">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-2 w-full lg:w-auto shrink-0">
               <button
                 type="button"
                 onClick={() => setActiveTab('DataRestore')}
-                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-sm cursor-pointer"
+                className="min-h-[42px] px-3 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-sm cursor-pointer"
               >
                 Recover Deleted ({allRecoverableItems.length})
               </button>
               <button
                 type="button"
-                onClick={() => setShowWelcomeScreen(true)}
-                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold cursor-pointer"
-              >
-                Full Welcome Screen
-              </button>
-              <button
-                type="button"
                 onClick={() => setActiveTab('Sales')}
-                className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-extrabold cursor-pointer"
+                className="min-h-[42px] px-3 py-2 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-extrabold cursor-pointer"
               >
                 Open POS Billing
               </button>
               <button
                 type="button"
-                onClick={() => setShowWelcomeBanner(false)}
-                aria-label="Dismiss Welcome Banner"
-                className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-emerald-200 cursor-pointer"
+                onClick={() => setShowSplashScreen(true)}
+                className="min-h-[40px] px-3 py-1.5 rounded-2xl bg-white/10 hover:bg-white/20 text-amber-300 text-xs font-semibold cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                Splash Screen
               </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setShowWelcomeScreen(true)}
+                  className="flex-1 min-h-[40px] px-3 py-1.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold cursor-pointer"
+                >
+                  Full Welcome Screen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowWelcomeBanner(false)}
+                  aria-label="Dismiss Welcome Banner"
+                  className="min-h-[40px] min-w-[40px] p-2 rounded-2xl bg-white/10 hover:bg-white/20 text-emerald-200 flex items-center justify-center cursor-pointer shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {/* Offline Connectivity Status Banner (PWA Cache in Action) */}
         {!isOnline && (
-          <div className="bg-amber-600 text-white px-4 py-2 rounded-xl shadow-md flex items-center justify-between gap-2 text-xs font-bold border border-amber-400">
+          <div className="bg-amber-600 text-white px-4 py-2.5 rounded-2xl shadow-md flex items-center justify-between gap-2 text-xs font-bold border border-amber-400">
             <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
+              <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse shrink-0" />
               <span>
-                Offline Mode Active — PWA Service Worker Cache in effect. All POS billing, medicines, and inventory continue to work offline without network connection.
+                Offline Mode Active — PWA Service Worker Cache in effect. All POS billing, medicines, and inventory continue to work offline.
               </span>
             </div>
-            <span className="font-mono text-[10px] bg-black/20 px-2 py-0.5 rounded">SW v2.6.0</span>
+            <span className="font-mono text-[10px] bg-black/20 px-2 py-0.5 rounded shrink-0">SW v2.6.0</span>
           </div>
         )}
 
@@ -1635,12 +1823,12 @@ export default function App() {
         </span>
       </footer>
 
-      {/* Bottom Quick-Access Taskbar (Purchases, Sales, Suppliers, Settings, Profile) */}
+      {/* Android Material Design 3 Bottom Navigation Bar */}
       <nav
         aria-label="Quick Access Bottom Taskbar"
-        className="fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-md"
+        className="fixed bottom-0 left-0 right-0 z-30 bg-white/98 dark:bg-slate-900/98 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(15,23,42,0.08)] pb-[env(safe-area-inset-bottom)]"
       >
-        <div className="max-w-md mx-auto grid grid-cols-5 py-1">
+        <div className="max-w-lg mx-auto grid grid-cols-5 px-1 py-1.5">
           {(
             [
               { id: 'Sales', label: 'Sales POS', Icon: ShoppingCart },
@@ -1649,21 +1837,34 @@ export default function App() {
               { id: 'Suppliers', label: 'Suppliers', Icon: Truck },
               { id: 'Settings', label: 'Settings', Icon: SettingsIcon },
             ] as const
-          ).map(({ id, label, Icon }) => (
-            <button
-              type="button"
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`flex flex-col items-center justify-center py-1 rounded-lg transition cursor-pointer ${
-                activeTab === id
-                  ? 'text-emerald-700 dark:text-emerald-400 font-bold'
-                  : 'text-slate-500 dark:text-slate-400'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span className="text-[10px] mt-0.5 whitespace-nowrap">{label}</span>
-            </button>
-          ))}
+          ).map(({ id, label, Icon }) => {
+            const isActive = activeTab === id;
+            return (
+              <button
+                type="button"
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`min-h-[52px] flex flex-col items-center justify-center rounded-xl transition cursor-pointer active:scale-95 ${
+                  isActive
+                    ? 'text-emerald-800 dark:text-emerald-300 font-extrabold'
+                    : 'text-slate-600 dark:text-slate-400 font-medium'
+                }`}
+              >
+                <span
+                  className={`px-3.5 py-1 rounded-full flex items-center justify-center transition-colors ${
+                    isActive
+                      ? 'bg-emerald-100 dark:bg-emerald-900/70 text-emerald-800 dark:text-emerald-300'
+                      : 'bg-transparent'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                </span>
+                <span className="text-[10px] sm:text-[11px] mt-0.5 leading-tight truncate max-w-full px-0.5">
+                  {label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </nav>
 

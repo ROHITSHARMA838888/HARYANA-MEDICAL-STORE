@@ -457,25 +457,25 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
         {subView !== 'movements' && subView !== 'deleted' && (
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex-1 min-w-[240px] flex items-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5">
+            <div className="w-full sm:flex-1 sm:min-w-[240px] min-w-0 flex items-center rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5">
               <Search className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Filter medicines by brand name, salt composition, batch no, rack, or supplier..."
-                className="w-full bg-transparent text-xs sm:text-sm focus:outline-none"
+                className="w-full min-w-0 bg-transparent text-xs sm:text-sm focus:outline-none"
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs">
                 {(['ALL', 'OTC', 'H', 'H1', 'X'] as const).map((sch) => (
                   <button
                     type="button"
                     key={sch}
                     onClick={() => setScheduleFilter(sch)}
-                    className={`px-2.5 py-1 rounded-md font-medium cursor-pointer ${
+                    className={`px-2.5 py-1.5 rounded-lg font-medium cursor-pointer ${
                       scheduleFilter === sch
                         ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
                         : 'text-slate-600 dark:text-slate-400'
@@ -487,7 +487,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
 
               {subView === 'batches' && (
-                <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs">
+                <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs">
                   {(
                     [
                       { id: 'ALL', label: 'All Status' },
@@ -500,7 +500,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       type="button"
                       key={st.id}
                       onClick={() => setStatusFilter(st.id)}
-                      className={`px-2.5 py-1 rounded-md font-medium cursor-pointer ${
+                      className={`px-2.5 py-1.5 rounded-lg font-medium cursor-pointer ${
                         statusFilter === st.id
                           ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
                           : 'text-slate-600 dark:text-slate-400'
@@ -545,20 +545,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         {row.salt} · {row.manufacturer}
                       </p>
                     </td>
-                    <td className="py-2.5 px-2 font-mono text-slate-600 dark:text-slate-400">
+                    <td data-label="Rack / Schedule" className="py-2.5 px-2 font-mono text-slate-600 dark:text-slate-400">
                       {row.rack} · Sch {row.schedule}
                     </td>
-                    <td className="py-2.5 px-2 font-mono">
+                    <td data-label="Batch & Barcode" className="py-2.5 px-2 font-mono">
                       <p className="font-semibold">{row.batchNo}</p>
                       <p className="text-[10px] text-slate-400">{row.barcode}</p>
                     </td>
-                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
+                    <td data-label="Supplier" className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
                       <p>{row.supplierName}</p>
                       <p className="text-[10px] font-mono text-slate-400">
                         Pur: {formatDateDDMMYYYY(row.purchaseDate)}
                       </p>
                     </td>
-                    <td className="py-2.5 px-2 font-mono">
+                    <td data-label="Expiry Date" className="py-2.5 px-2 font-mono">
                       <p
                         className={
                           row.statusLabel === 'Expired'
@@ -574,18 +574,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         {row.days < 0 ? `${Math.abs(row.days)}d ago` : `${row.days}d left`}
                       </p>
                     </td>
-                    <td className="py-2.5 px-2 text-right font-mono font-bold text-slate-900 dark:text-white">
+                    <td data-label="Stock Qty" className="py-2.5 px-2 text-right font-mono font-bold text-slate-900 dark:text-white">
                       {row.quantity}
                     </td>
                     {userRole === 'Owner' && (
-                      <td className="py-2.5 px-2 text-right font-mono text-slate-600 dark:text-slate-400">
+                      <td data-label="Pur. Rate" className="py-2.5 px-2 text-right font-mono text-slate-600 dark:text-slate-400">
                         {formatINR(row.purchaseRate)}
                       </td>
                     )}
-                    <td className="py-2.5 px-2 text-right font-mono font-semibold">
+                    <td data-label="MRP" className="py-2.5 px-2 text-right font-mono font-semibold">
                       {formatINR(row.mrp)}
                     </td>
-                    <td className="py-2.5 px-2 font-medium whitespace-nowrap">
+                    <td data-label="Status" className="py-2.5 px-2 font-medium whitespace-nowrap">
                       {row.statusLabel === 'Expired' && (
                         <span className="text-red-600 dark:text-red-400 font-semibold">
                           ⛔ Expired
@@ -607,13 +607,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         </span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+                    <td data-label="Actions" className="py-2.5 px-3 text-right">
+                      <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                         <button
                           type="button"
                           onClick={() => setDetailsMedId(row.medicineId)}
                           aria-label={`View complete details and history for ${row.medName}`}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold cursor-pointer"
                         >
                           <Eye className="w-3 h-3" /> Details & History
                         </button>
@@ -621,7 +621,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           type="button"
                           onClick={() => openEditModal(row.medicineId, row.id)}
                           aria-label={`Edit ${row.medName} (${row.batchNo})`}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-[11px] font-semibold cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-[11px] font-semibold cursor-pointer"
                         >
                           <Edit3 className="w-3 h-3" /> Edit
                         </button>
@@ -636,7 +636,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             })
                           }
                           aria-label={`Delete ${row.medName} (${row.batchNo})`}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-50 dark:bg-red-950/50 hover:bg-red-100 text-red-600 dark:text-red-400 text-[11px] font-semibold cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/50 hover:bg-red-100 text-red-600 dark:text-red-400 text-[11px] font-semibold cursor-pointer"
                         >
                           <Trash2 className="w-3 h-3" /> Delete
                         </button>
@@ -676,27 +676,27 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           {med.salt} · {med.manufacturer}
                         </p>
                       </td>
-                      <td className="py-2.5 px-2 font-mono text-slate-600 dark:text-slate-400">
+                      <td data-label="Category & HSN" className="py-2.5 px-2 font-mono text-slate-600 dark:text-slate-400">
                         {med.category} · HSN {med.hsn} ({med.gst}% GST)
                       </td>
-                      <td className="py-2.5 px-2 font-mono">
+                      <td data-label="Schedule / Rack" className="py-2.5 px-2 font-mono">
                         Sch {med.schedule} · Rack {med.rack}
                       </td>
-                      <td className="py-2.5 px-2 font-mono text-slate-500">
+                      <td data-label="Packing" className="py-2.5 px-2 font-mono text-slate-500">
                         {med.stripsPerBox}x{med.unitsPerStrip}
                       </td>
-                      <td className="py-2.5 px-2 text-right font-mono">{medBatches.length}</td>
-                      <td className="py-2.5 px-2 text-right font-mono font-bold">{totalStock}</td>
-                      <td className="py-2.5 px-2 font-mono text-slate-500">
+                      <td data-label="Total Batches" className="py-2.5 px-2 text-right font-mono">{medBatches.length}</td>
+                      <td data-label="Total Stock" className="py-2.5 px-2 text-right font-mono font-bold">{totalStock}</td>
+                      <td data-label="Last Sold" className="py-2.5 px-2 font-mono text-slate-500">
                         {formatDateDDMMYYYY(med.lastSoldDate)}
                       </td>
-                      <td className="py-2.5 px-3 text-right">
+                      <td data-label="Actions" className="py-2.5 px-3 text-right">
                         <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => setDetailsMedId(med.id)}
                             aria-label={`View complete details and history for ${med.name}`}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold cursor-pointer"
                           >
                             <Eye className="w-3 h-3" /> Details & History
                           </button>
@@ -704,7 +704,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             type="button"
                             onClick={() => openEditModal(med.id)}
                             aria-label={`Edit ${med.name}`}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-[11px] font-semibold cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-[11px] font-semibold cursor-pointer"
                           >
                             <Edit3 className="w-3 h-3" /> Edit
                           </button>
@@ -717,7 +717,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               })
                             }
                             aria-label={`Delete ${med.name}`}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-50 dark:bg-red-950/50 hover:bg-red-100 text-red-600 dark:text-red-400 text-[11px] font-semibold cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/50 hover:bg-red-100 text-red-600 dark:text-red-400 text-[11px] font-semibold cursor-pointer"
                           >
                             <Trash2 className="w-3 h-3" /> Delete
                           </button>
@@ -1162,7 +1162,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label htmlFor="edit-med-sch" className="block font-medium mb-1">
                     Schedule
@@ -1185,6 +1185,31 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     <option value="H">Schedule H</option>
                     <option value="H1">Schedule H1</option>
                     <option value="X">Schedule X</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="edit-med-gst" className="block font-bold text-emerald-700 dark:text-emerald-400 mb-1">
+                    GST %
+                  </label>
+                  <select
+                    id="edit-med-gst"
+                    value={editTarget.medicine.gst}
+                    onChange={(e) =>
+                      setEditTarget({
+                        ...editTarget,
+                        medicine: {
+                          ...editTarget.medicine,
+                          gst: Number(e.target.value),
+                        },
+                      })
+                    }
+                    className="w-full px-2.5 py-2 rounded-lg border border-emerald-500/60 bg-white dark:bg-slate-800 font-mono font-bold"
+                  >
+                    <option value={0}>0% (Free)</option>
+                    <option value={5}>5% GST</option>
+                    <option value={12}>12% GST</option>
+                    <option value={18}>18% GST</option>
+                    <option value={28}>28% GST</option>
                   </select>
                 </div>
                 <div>
@@ -1468,7 +1493,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label htmlFor="inv-med-sch" className="block font-medium mb-1">
                     Schedule
@@ -1483,6 +1508,24 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     <option value="H">Schedule H</option>
                     <option value="H1">Schedule H1</option>
                     <option value="X">Schedule X</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="inv-med-gst" className="block font-bold text-emerald-700 dark:text-emerald-400 mb-1">
+                    GST % *
+                  </label>
+                  <select
+                    id="inv-med-gst"
+                    required
+                    value={gst}
+                    onChange={(e) => setGst(Number(e.target.value))}
+                    className="w-full px-2.5 py-2 rounded-lg border border-emerald-500/60 bg-white dark:bg-slate-800 font-mono font-bold"
+                  >
+                    <option value={0}>0% (Free)</option>
+                    <option value={5}>5% GST</option>
+                    <option value={12}>12% GST</option>
+                    <option value={18}>18% GST</option>
+                    <option value={28}>28% GST</option>
                   </select>
                 </div>
                 <div>

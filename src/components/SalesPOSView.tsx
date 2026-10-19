@@ -526,7 +526,8 @@ export const SalesPOSView: React.FC<SalesPOSViewProps> = ({
               <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
                 {editingSale ? `Editing Bill ${editingSale.id}` : 'POS Billing Counter (FEFO Auto-Batch)'}
               </h2>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-mono text-xs font-bold">
+              <span aria-hidden="true" className="text-slate-300 dark:text-slate-700">·</span>
+              <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-mono tabular-nums text-xs font-bold">
                 <Hash className="w-3.5 h-3.5" />
                 Auto Bill No: {nextBillNumber}
               </span>
@@ -580,9 +581,9 @@ export const SalesPOSView: React.FC<SalesPOSViewProps> = ({
                   type="button"
                   onClick={() => setMedSearch('')}
                   aria-label="Clear medicine search"
-                  className="text-xs text-slate-400 hover:text-slate-600 px-1"
+                  className="text-sm font-bold text-slate-400 hover:text-slate-600 px-1 cursor-pointer"
                 >
-                  ✕
+                  &times;
                 </button>
               )}
             </div>
@@ -653,15 +654,15 @@ export const SalesPOSView: React.FC<SalesPOSViewProps> = ({
           </div>
         </div>
 
-        {/* Quick Tap Popular Medicines Strip */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
-          <span className="text-xs text-slate-400 shrink-0 mr-1">Quick Add:</span>
+        {/* Quick Tap Popular Medicines Strip (Wraps cleanly on Android mobile) */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          <span className="text-xs font-semibold text-slate-500 shrink-0 mr-1">Quick Add:</span>
           {medicines.slice(0, 6).map((m) => (
             <button
               type="button"
               key={m.id}
               onClick={() => addMedicineToCart(m)}
-              className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap shrink-0 cursor-pointer"
+              className="min-h-[36px] px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 transition cursor-pointer active:scale-95"
             >
               + {m.name}
             </button>
@@ -679,6 +680,7 @@ export const SalesPOSView: React.FC<SalesPOSViewProps> = ({
                 <th className="py-2.5 px-2 text-center">Qty</th>
                 <th className="py-2.5 px-2 text-right">MRP</th>
                 <th className="py-2.5 px-2 text-center">Disc%</th>
+                <th className="py-2.5 px-2 text-center">GST%</th>
                 <th className="py-2.5 px-3 text-right">Line Total</th>
                 <th className="py-2.5 px-2 text-center">Action</th>
               </tr>
@@ -686,7 +688,7 @@ export const SalesPOSView: React.FC<SalesPOSViewProps> = ({
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {totals.items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-slate-400">
+                  <td colSpan={9} className="py-10 text-center text-slate-400">
                     Cart is empty. Search a medicine above or use a Quick Add button to begin billing.
                   </td>
                 </tr>
@@ -714,7 +716,7 @@ export const SalesPOSView: React.FC<SalesPOSViewProps> = ({
                           )}
                         </p>
                       </td>
-                      <td className="py-2.5 px-2 font-mono">
+                      <td data-label="FEFO Batch" className="py-2.5 px-2 font-mono">
                         {medBatches.length > 1 ? (
                           <select
                             aria-label={`Select batch for ${item.medicineName}`}
@@ -735,7 +737,7 @@ export const SalesPOSView: React.FC<SalesPOSViewProps> = ({
                               };
                               setCart(next);
                             }}
-                            className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 text-xs"
+                            className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs"
                           >
                             {medBatches.map((b) => (
                               <option key={b.id} value={b.id}>
@@ -747,10 +749,10 @@ export const SalesPOSView: React.FC<SalesPOSViewProps> = ({
                           <span>{item.batchNo}</span>
                         )}
                       </td>
-                      <td className="py-2.5 px-2 font-mono text-slate-600 dark:text-slate-400">
+                      <td data-label="Expiry Date" className="py-2.5 px-2 font-mono text-slate-600 dark:text-slate-400">
                         {formatDateDDMMYYYY(item.expiryDate)}
                       </td>
-                      <td className="py-2.5 px-2 text-center font-mono">
+                      <td data-label="Quantity" className="py-2.5 px-2 text-center font-mono">
                         <input
                           type="number"
                           min={1}
@@ -770,11 +772,11 @@ export const SalesPOSView: React.FC<SalesPOSViewProps> = ({
                             next[idx].qty = val;
                             setCart(next);
                           }}
-                          className="w-16 text-center rounded border border-slate-300 dark:border-slate-700 bg-transparent py-1"
+                          className="w-20 sm:w-16 text-center rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent py-1"
                         />
                       </td>
-                      <td className="py-2.5 px-2 text-right font-mono">{formatINR(item.mrp)}</td>
-                      <td className="py-2.5 px-2 text-center font-mono">
+                      <td data-label="MRP" className="py-2.5 px-2 text-right font-mono">{formatINR(item.mrp)}</td>
+                      <td data-label="Discount %" className="py-2.5 px-2 text-center font-mono">
                         <input
                           type="number"
                           min={0}
@@ -789,18 +791,36 @@ export const SalesPOSView: React.FC<SalesPOSViewProps> = ({
                             );
                             setCart(next);
                           }}
-                          className="w-14 text-center rounded border border-slate-300 dark:border-slate-700 bg-transparent py-1"
+                          className="w-20 sm:w-14 text-center rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent py-1"
                         />
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
+                      <td data-label="GST %" className="py-2.5 px-2 text-center font-mono">
+                        <select
+                          aria-label={`GST percentage for ${item.medicineName}`}
+                          value={item.gst}
+                          onChange={(e) => {
+                            const next = [...cart];
+                            next[idx].gst = Number(e.target.value);
+                            setCart(next);
+                          }}
+                          className="bg-emerald-50 dark:bg-slate-800 border border-emerald-500/60 rounded-lg px-2 py-1 text-xs font-bold text-emerald-800 dark:text-emerald-300"
+                        >
+                          <option value={0}>0%</option>
+                          <option value={5}>5%</option>
+                          <option value={12}>12%</option>
+                          <option value={18}>18%</option>
+                          <option value={28}>28%</option>
+                        </select>
+                      </td>
+                      <td data-label="Line Total" className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
                         {formatINR(item.total)}
                       </td>
-                      <td className="py-2.5 px-2 text-center">
+                      <td data-label="Action" className="py-2.5 px-2 text-center">
                         <button
                           type="button"
                           onClick={() => setCart(cart.filter((_, i) => i !== idx))}
                           aria-label={`Remove ${item.medicineName} from bill`}
-                          className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded cursor-pointer"
+                          className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1039,16 +1059,16 @@ export const SalesPOSView: React.FC<SalesPOSViewProps> = ({
               {deletedSaleBills.map((item) => (
                 <div
                   key={item.id}
-                  className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-2"
+                  className="min-w-0 p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2"
                 >
-                  <div className="min-w-0">
-                    <p className="font-bold text-slate-900 dark:text-white truncate">{item.title}</p>
-                    <p className="text-[11px] text-slate-500 truncate">{item.subtitle}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-slate-900 dark:text-white break-words">{item.title}</p>
+                    <p className="text-[11px] text-slate-500 break-words">{item.subtitle}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => onRestoreItem(item)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] whitespace-nowrap shrink-0 cursor-pointer shadow-xs"
+                    className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] whitespace-nowrap shrink-0 cursor-pointer shadow-xs w-full sm:w-auto"
                   >
                     <RotateCcw className="w-3.5 h-3.5" /> Recover Sale Bill
                   </button>
@@ -1078,35 +1098,35 @@ export const SalesPOSView: React.FC<SalesPOSViewProps> = ({
                   <td className="py-2 px-3 font-mono font-bold text-emerald-700 dark:text-emerald-400">
                     {s.id}
                   </td>
-                  <td className="py-2 px-2 font-mono text-slate-500">
+                  <td data-label="Date & Time" className="py-2 px-2 font-mono text-slate-500">
                     {formatDateDDMMYYYY(s.date)} · {s.time}
                   </td>
-                  <td className="py-2 px-3">
+                  <td data-label="Customer" className="py-2 px-3">
                     <span className="font-semibold text-slate-900 dark:text-white">
                       {s.customerName}
                     </span>{' '}
                     <span className="text-slate-500">({s.doctorName})</span>
                   </td>
-                  <td className="py-2 px-2 text-slate-600 dark:text-slate-300">
+                  <td data-label="Medicines" className="py-2 px-2 text-slate-600 dark:text-slate-300">
                     {s.items.map((i) => `${i.medicineName} (x${i.qty})`).join(', ')}
                   </td>
-                  <td className="py-2 px-2">{s.paymentMode}</td>
-                  <td className="py-2 px-2 text-right font-mono font-bold">
+                  <td data-label="Payment" className="py-2 px-2">{s.paymentMode}</td>
+                  <td data-label="Grand Total" className="py-2 px-2 text-right font-mono font-bold">
                     {formatINR(s.grandTotal)}
                   </td>
-                  <td className="py-2 px-3 text-right whitespace-nowrap">
+                  <td data-label="Actions" className="py-2 px-3 text-right whitespace-nowrap">
                     <div className="inline-flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => setInvoiceModalSale(s)}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-semibold cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-semibold cursor-pointer"
                       >
                         <FileText className="w-3 h-3" /> Invoice
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteSaleBill(s)}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-50 dark:bg-red-950/60 hover:bg-red-100 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 text-[11px] font-semibold cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/60 hover:bg-red-100 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 text-[11px] font-semibold cursor-pointer"
                       >
                         <Trash2 className="w-3 h-3" /> Delete
                       </button>

@@ -245,21 +245,21 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
 
                 return (
                   <tr key={s.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                    <td className="py-2.5 px-3 font-semibold text-slate-900 dark:text-white">
+                    <td data-label="Supplier Name" className="py-2.5 px-3 font-semibold text-slate-900 dark:text-white">
                       {s.name}
                     </td>
-                    <td className="py-2.5 px-2 font-mono">{s.gstin}</td>
-                    <td className="py-2.5 px-2 font-mono">{s.phone}</td>
-                    <td className="py-2.5 px-2 text-slate-500">{s.address}</td>
-                    <td className="py-2.5 px-2 text-right font-mono">{formatINR(totalPur)}</td>
-                    <td className="py-2.5 px-2 text-right font-mono font-bold">
+                    <td data-label="GSTIN" className="py-2.5 px-2 font-mono">{s.gstin}</td>
+                    <td data-label="Phone" className="py-2.5 px-2 font-mono">{s.phone}</td>
+                    <td data-label="Address" className="py-2.5 px-2 text-slate-500">{s.address}</td>
+                    <td data-label="Total Purchased" className="py-2.5 px-2 text-right font-mono">{formatINR(totalPur)}</td>
+                    <td data-label="Payable Balance" className="py-2.5 px-2 text-right font-mono font-bold">
                       {payable > 0 ? (
                         <span className="text-amber-600">{formatINR(payable)}</span>
                       ) : (
                         <span className="text-emerald-700">Settled</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-right">
+                    <td data-label="Actions" className="py-2.5 px-3 text-right">
                       <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                         <button
                           type="button"
@@ -332,17 +332,17 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
                 const due = Math.max(0, p.grandTotal - p.paidAmount);
                 return (
                   <tr key={p.id}>
-                    <td className="py-2 px-3 font-semibold">{p.invoiceNo}</td>
-                    <td className="py-2 px-2 font-sans">{p.supplierName}</td>
-                    <td className="py-2 px-2">{formatDateDDMMYYYY(p.date)}</td>
-                    <td className="py-2 px-2 text-right">{formatINR(p.grandTotal)}</td>
-                    <td className="py-2 px-2 text-right text-emerald-700">
+                    <td data-label="Invoice No" className="py-2 px-3 font-semibold">{p.invoiceNo}</td>
+                    <td data-label="Supplier" className="py-2 px-2 font-sans">{p.supplierName}</td>
+                    <td data-label="Date" className="py-2 px-2">{formatDateDDMMYYYY(p.date)}</td>
+                    <td data-label="Grand Total" className="py-2 px-2 text-right">{formatINR(p.grandTotal)}</td>
+                    <td data-label="Paid" className="py-2 px-2 text-right text-emerald-700">
                       {formatINR(p.paidAmount)}
                     </td>
-                    <td className="py-2 px-2 text-right font-bold text-amber-600">
+                    <td data-label="Pending" className="py-2 px-2 text-right font-bold text-amber-600">
                       {formatINR(due)}
                     </td>
-                    <td className="py-2 px-3 text-right font-sans">
+                    <td data-label="Action" className="py-2 px-3 text-right font-sans">
                       {due > 0 ? (
                         <button
                           type="button"
@@ -945,13 +945,13 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
 
                 return (
                   <tr key={c.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                    <td className="py-2.5 px-3 font-semibold text-slate-900 dark:text-white">
+                    <td data-label="Customer Name" className="py-2.5 px-3 font-semibold text-slate-900 dark:text-white">
                       {c.name}
                     </td>
-                    <td className="py-2.5 px-2 font-mono">{c.mobile}</td>
-                    <td className="py-2.5 px-2 text-slate-500">{c.address}</td>
-                    <td className="py-2.5 px-2">
-                      <div className="flex flex-wrap gap-1">
+                    <td data-label="Mobile" className="py-2.5 px-2 font-mono">{c.mobile}</td>
+                    <td data-label="Address" className="py-2.5 px-2 text-slate-500">{c.address}</td>
+                    <td data-label="Recent Bills" className="py-2.5 px-2">
+                      <div className="flex flex-wrap gap-1 justify-end sm:justify-start">
                         {custBills.map((b) => (
                           <button
                             type="button"
@@ -964,14 +964,14 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                         ))}
                       </div>
                     </td>
-                    <td className="py-2.5 px-2 text-right font-mono font-bold">
+                    <td data-label="Pending Udhaar" className="py-2.5 px-2 text-right font-mono font-bold">
                       {c.udhaarBalance > 0 ? (
                         <span className="text-amber-600">{formatINR(c.udhaarBalance)}</span>
                       ) : (
                         <span className="text-emerald-700">₹0.00</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-right">
+                    <td data-label="Actions" className="py-2.5 px-3 text-right">
                       <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                         <button
                           type="button"

@@ -14,10 +14,15 @@ export function usePWAInstall() {
   );
 
   useEffect(() => {
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-    setIsInstalled(isStandalone);
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const checkStandalone = () => {
+      const isStandalone =
+        mediaQuery.matches ||
+        window.matchMedia('(display-mode: minimal-ui)').matches ||
+        (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+      setIsInstalled(isStandalone);
+    };
+    checkStandalone();
 
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
@@ -40,19 +45,14 @@ export function usePWAInstall() {
     window.addEventListener('appinstalled', handleAppInstalled);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
-    // Register service worker for offline-first functionality
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {
-        // Ignore in restricted iframe contexts
-      });
-    }
+    mediaQuery.addEventListener?.('change', checkStandalone);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      mediaQuery.removeEventListener?.('change', checkStandalone);
     };
   }, []);
 
