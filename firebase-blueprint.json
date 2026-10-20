@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "PharmacyCloudState": {
+      "title": "PharmacyCloudState",
+      "description": "Real-time synchronized state and cloud backup snapshot for Haryana Medical Store POS",
+      "type": "object",
+      "properties": {
+        "shopId": {
+          "type": "string",
+          "description": "Unique identifier for Haryana Medical Store",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Originating terminal device ID for real-time sync loop prevention",
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "description": "Application schema version",
+          "maxLength": 32
+        },
+        "checksum": {
+          "type": "string",
+          "description": "Integrity checksum for backup verification",
+          "maxLength": 64
+        },
+        "lastCloudSync": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of last cloud sync or backup",
+          "maxLength": 64
+        },
+        "lastSyncTimestamp": {
+          "type": "number",
+          "description": "Epoch milliseconds of last state update"
+        },
+        "revision": {
+          "type": "number",
+          "description": "Monotonically increasing sync revision counter"
+        }
+      },
+      "required": ["lastCloudSync"]
+    }
+  },
+  "firestore": {
+    "/haryana_medical_store/{docId}": {
+      "schema": {
+        "$ref": "#/entities/PharmacyCloudState"
+      },
+      "description": "Stores live real-time sync documents and verified cloud backups for Haryana Medical Store"
+    }
+  }
+}

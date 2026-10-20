@@ -6,7 +6,7 @@
  */
 
 const CACHE_PREFIX = 'haryana-medical-store';
-const SW_VERSION = 'v2.8.1';
+const SW_VERSION = 'v2.9.0';
 const PRECACHE_NAME = `${CACHE_PREFIX}-precache-${SW_VERSION}`;
 const STATIC_CACHE_NAME = `${CACHE_PREFIX}-static-${SW_VERSION}`;
 const FONT_CACHE_NAME = `${CACHE_PREFIX}-fonts-${SW_VERSION}`;

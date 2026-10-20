@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Bell,
   MoreVertical,
@@ -63,7 +63,42 @@ import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
 import { DataRestoreView } from './components/DataRestoreView';
 import { SplashScreen } from './components/SplashScreen';
-import { syncCloudBackup } from './utils/firebaseSync';
+import {
+  APP_CURRENT_VERSION,
+  DEFAULT_GITHUB_REPO,
+  createBackupPayload,
+  validateBackupPayload,
+  mergeBackupPayloadSafely,
+  enqueueOfflineAction,
+  markQueueItemFailed,
+  removeQueueItem,
+  type GitHubReleaseCheckResult,
+  type OfflineQueueItem,
+  type PharmacyStateSnapshot,
+  type SyncMetadata,
+} from './utils/storageAndSyncLogic';
+import {
+  ensureInternalStorageFolders,
+  saveBackupToInternalStorage,
+  listInternalBackups,
+  readBackupFromInternalStorage,
+  deleteBackupFromInternalStorage,
+  exportInternalBackupFileToDevice,
+  saveOfflineQueueToStorage,
+  loadOfflineQueueFromStorage,
+  type InternalStorageFileMeta,
+  type InternalStorageHealth,
+} from './utils/internalStorage';
+import {
+  testFirestoreConnection,
+  subscribeToRealtimePharmacySync,
+  pushRealtimePharmacySync,
+  createSafeCloudBackup,
+  fetchCloudBackupMetadata,
+  restoreFromSafeCloudBackup,
+  type CloudBackupMetadata,
+} from './utils/firebaseSync';
+import { checkGitHubReleaseUpdate } from './utils/githubUpdater';
 
 function usePersistentState<T>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [state, setState] = useState<T>(() => {
@@ -220,13 +255,67 @@ export default function App() {
   );
   const [showIOSInstallGuide, setShowIOSInstallGuide] = useState(false);
 
-  // In-App Update System State
+  // In-App Update & GitHub Release State
   const [updateState, setUpdateState] = useState({
     available: false,
     downloading: false,
     downloaded: false,
-    version: '2.5.0',
+    version: APP_CURRENT_VERSION,
+    apkDownloadUrl: '/haryana-medical-store-release.apk',
+    apkFileName: 'HaryanaMedicalStore-Release.apk',
+    releaseNotes: '',
   });
+  const [githubRepoSlug, setGithubRepoSlug] = usePersistentState<string>(
+    'hms_github_repo_slug_v1',
+    DEFAULT_GITHUB_REPO
+  );
+  const [githubReleaseInfo, setGithubReleaseInfo] = useState<GitHubReleaseCheckResult | null>(null);
+  const [checkingGithubUpdate, setCheckingGithubUpdate] = useState(false);
+
+  // Internal Storage, Firebase Real-Time Sync & Offline Queue State
+  const [internalStorageHealth, setInternalStorageHealth] = useState<InternalStorageHealth | null>(
+    null
+  );
+  const [internalBackups, setInternalBackups] = useState<InternalStorageFileMeta[]>([]);
+  const [realtimeSyncEnabled, setRealtimeSyncEnabled] = usePersistentState<boolean>(
+    'hms_realtime_sync_enabled_v1',
+    true
+  );
+  const [realtimeSyncStatus, setRealtimeSyncStatus] = useState<
+    'connected' | 'syncing' | 'offline' | 'error'
+  >('connected');
+  const [realtimeSyncDetail, setRealtimeSyncDetail] = useState<string>(
+    'Firestore Real-Time Listener Ready'
+  );
+  const [lastRealtimeSyncAt, setLastRealtimeSyncAt] = usePersistentState<string>(
+    'hms_last_realtime_sync_at_v1',
+    ''
+  );
+  const [offlineQueue, setOfflineQueue] = useState<OfflineQueueItem[]>(() =>
+    loadOfflineQueueFromStorage()
+  );
+  const [cloudBackupMeta, setCloudBackupMeta] = useState<CloudBackupMetadata | null>(null);
+  const [cloudActionBusy, setCloudActionBusy] = useState(false);
+
+  const deviceIdRef = useRef<string>(
+    (() => {
+      try {
+        const existing = localStorage.getItem('hms_pos_device_id_v1');
+        if (existing) return existing;
+        const created = `HMS-POS-${Math.random().toString(36).slice(2, 9).toUpperCase()}`;
+        localStorage.setItem('hms_pos_device_id_v1', created);
+        return created;
+      } catch {
+        return 'HMS-POS-DEFAULT';
+      }
+    })()
+  );
+  const syncMetaRef = useRef<SyncMetadata>({
+    deviceId: deviceIdRef.current,
+    lastSyncTimestamp: Date.now(),
+    revision: 1,
+  });
+  const isApplyingRemoteRef = useRef(false);
 
   const { isInstallable, isInstalled, isIOS, isOnline, install } = usePWAInstall();
 
@@ -610,10 +699,9 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // JSON Export & Import
-  const handleExportJSONBackup = () => {
-    const payload = {
-      exportedAt: new Date().toISOString(),
+  // Build current snapshot helper
+  const getCurrentSnapshot = useCallback(
+    (): PharmacyStateSnapshot => ({
       settings,
       medicines,
       batches,
@@ -625,7 +713,189 @@ export default function App() {
       saleReturns,
       stockMovements,
       deletedItems,
+    }),
+    [
+      settings,
+      medicines,
+      batches,
+      suppliers,
+      customers,
+      purchases,
+      purchaseReturns,
+      sales,
+      saleReturns,
+      stockMovements,
+      deletedItems,
+    ]
+  );
+
+  const applyValidatedStateSnapshot = useCallback(
+    (nextState: PharmacyStateSnapshot) => {
+      setSettings(nextState.settings);
+      setMedicines(nextState.medicines);
+      setBatches(nextState.batches);
+      setSuppliers(nextState.suppliers);
+      setCustomers(nextState.customers);
+      setPurchases(nextState.purchases);
+      setPurchaseReturns(nextState.purchaseReturns);
+      setSales(nextState.sales);
+      setSaleReturns(nextState.saleReturns);
+      setStockMovements(nextState.stockMovements);
+      setDeletedItems(nextState.deletedItems);
+    },
+    [
+      setSettings,
+      setMedicines,
+      setBatches,
+      setSuppliers,
+      setCustomers,
+      setPurchases,
+      setPurchaseReturns,
+      setSales,
+      setSaleReturns,
+      setStockMovements,
+      setDeletedItems,
+    ]
+  );
+
+  const refreshInternalStorageState = useCallback(async () => {
+    const health = await ensureInternalStorageFolders();
+    const files = await listInternalBackups('all');
+    setInternalStorageHealth(health);
+    setInternalBackups(files);
+    return files;
+  }, []);
+
+  // Persist offlineQueue whenever it changes
+  useEffect(() => {
+    void saveOfflineQueueToStorage(offlineQueue);
+  }, [offlineQueue]);
+
+  // Boot: Ensure Internal Storage Folders, create initial backup snapshot if empty, and test Firestore connection
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const existingFiles = await refreshInternalStorageState();
+      if (active && existingFiles.length === 0) {
+        await saveBackupToInternalStorage(
+          getCurrentSnapshot(),
+          'backups',
+          'Initial Automatic Internal Storage Snapshot'
+        );
+        await refreshInternalStorageState();
+      }
+      await testFirestoreConnection();
+      const meta = await fetchCloudBackupMetadata();
+      if (active && meta) {
+        setCloudBackupMeta(meta);
+      }
+    })();
+    return () => {
+      active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Firebase Real-Time Sync Listener (onSnapshot) with proper cleanup
+  useEffect(() => {
+    if (!realtimeSyncEnabled) {
+      setRealtimeSyncDetail('Real-Time Listener Paused by User');
+      return;
+    }
+
+    const unsubscribe = subscribeToRealtimePharmacySync(
+      () => syncMetaRef.current,
+      {
+        onRemoteData: (remotePayload, remoteMeta) => {
+          isApplyingRemoteRef.current = true;
+          syncMetaRef.current = {
+            ...syncMetaRef.current,
+            lastSyncTimestamp: remoteMeta.lastSyncTimestamp,
+            revision: Math.max(syncMetaRef.current.revision, remoteMeta.revision),
+          };
+          const merged = mergeBackupPayloadSafely(getCurrentSnapshot(), remotePayload, 'merge');
+          applyValidatedStateSnapshot(merged);
+          const nowStr = new Date().toLocaleString('en-IN');
+          setLastRealtimeSyncAt(nowStr);
+          setRealtimeSyncStatus('connected');
+          setRealtimeSyncDetail(`Synced from ${remoteMeta.deviceId} at ${nowStr}`);
+          window.setTimeout(() => {
+            isApplyingRemoteRef.current = false;
+          }, 300);
+        },
+        onStatusChange: (status, detail) => {
+          setRealtimeSyncStatus(status);
+          if (detail) setRealtimeSyncDetail(detail);
+        },
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [realtimeSyncEnabled, getCurrentSnapshot, applyValidatedStateSnapshot, setLastRealtimeSyncAt]);
+
+  // Separate Action 1: Save Backup to Internal Storage Folder (`HaryanaMedicalStore/backups/`)
+  const handleSaveInternalBackup = async (note?: string) => {
+    const snap = getCurrentSnapshot();
+    const meta = await saveBackupToInternalStorage(snap, 'backups', note);
+    const nowFormatted = new Date().toLocaleString('en-IN');
+    setSettings((p) => ({ ...p, lastBackupTime: nowFormatted }));
+    await refreshInternalStorageState();
+    showToast(`Saved "${meta.fileName}" in Internal Storage (${meta.folderPath})!`);
+  };
+
+  // Separate Action 2: Restore from Internal Storage Folder (with Automatic Pre-Restore Safety Snapshot)
+  const handleRestoreInternalBackup = async (
+    fullPath: string,
+    mode: 'merge' | 'replace' = 'merge'
+  ) => {
+    const currentSnap = getCurrentSnapshot();
+    // Always create a Pre-Restore Safety Snapshot first
+    await saveBackupToInternalStorage(
+      currentSnap,
+      'safety_snapshots',
+      `Pre-Restore Safety Snapshot before restoring ${fullPath.split('/').pop()}`
+    );
+
+    const readRes = await readBackupFromInternalStorage(fullPath);
+    if (!readRes.ok || !readRes.payload) {
+      await refreshInternalStorageState();
+      showToast(readRes.error || 'Could not read internal backup file.', 'error');
+      return;
+    }
+
+    const nextState = mergeBackupPayloadSafely(currentSnap, readRes.payload, mode);
+    applyValidatedStateSnapshot(nextState);
+    await refreshInternalStorageState();
+    showToast(
+      `Restored "${fullPath.split('/').pop()}" (${mode === 'merge' ? 'Safe Merge' : 'Full Replace'}). Safety rollback snapshot saved!`
+    );
+  };
+
+  // Separate Action 3: Delete a Snapshot from Internal Storage Folder
+  const handleDeleteInternalBackup = async (fullPath: string) => {
+    await deleteBackupFromInternalStorage(fullPath);
+    await refreshInternalStorageState();
+    showToast(`Deleted "${fullPath.split('/').pop()}" from Internal Storage.`, 'info');
+  };
+
+  // Separate Action 4: Export a Saved Internal Backup File to Device
+  const handleExportInternalBackupFile = async (fullPath: string) => {
+    const ok = await exportInternalBackupFileToDevice(fullPath);
+    if (ok) {
+      showToast(`Exported "${fullPath.split('/').pop()}" to device downloads!`);
+    } else {
+      showToast('Failed to export internal backup file.', 'error');
+    }
+  };
+
+  // Separate Action 5: Export External JSON Backup File (Separated from Cloud Backup)
+  const handleExportJSONBackup = () => {
+    const payload = createBackupPayload(getCurrentSnapshot(), 'EXTERNAL_JSON', {
+      deviceId: deviceIdRef.current,
+      note: 'External JSON File Export',
+    });
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: 'application/json',
     });
@@ -639,39 +909,285 @@ export default function App() {
       ...p,
       lastBackupTime: new Date().toLocaleString('en-IN'),
     }));
-    void syncCloudBackup({
-      settings,
-      medicines,
-      batches,
-      suppliers,
-      customers,
-      sales,
-      purchases,
-    });
-    showToast('Complete Pharmacy Database exported as JSON backup & synced to Cloud!');
+    showToast('Exported Pharmacy Database as External JSON File!');
   };
 
-  const handleImportJSONBackup = (file: File | undefined) => {
+  // Separate Action 6: Import & Restore External JSON File (with Validation & Pre-Restore Safety Snapshot)
+  const handleImportJSONBackup = (
+    file: File | undefined,
+    mode: 'merge' | 'replace' = 'merge'
+  ) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const parsed = JSON.parse(String(e.target?.result || '{}'));
-        if (parsed.settings) setSettings(parsed.settings);
-        if (parsed.medicines) setMedicines(parsed.medicines);
-        if (parsed.batches) setBatches(parsed.batches);
-        if (parsed.suppliers) setSuppliers(parsed.suppliers);
-        if (parsed.customers) setCustomers(parsed.customers);
-        if (parsed.purchases) setPurchases(parsed.purchases);
-        if (parsed.sales) setSales(parsed.sales);
-        if (parsed.stockMovements) setStockMovements(parsed.stockMovements);
-        if (parsed.deletedItems) setDeletedItems(parsed.deletedItems);
-        showToast('Full Pharmacy Database restored from JSON backup!');
+        const validation = validateBackupPayload(parsed);
+        if (!validation.valid || !validation.payload) {
+          showToast(
+            `Invalid JSON backup: ${validation.errors[0] || 'Schema validation failed.'}`,
+            'error'
+          );
+          return;
+        }
+
+        const currentSnap = getCurrentSnapshot();
+        await saveBackupToInternalStorage(
+          currentSnap,
+          'safety_snapshots',
+          `Pre-Restore Safety Snapshot before importing ${file.name}`
+        );
+
+        const nextState = mergeBackupPayloadSafely(currentSnap, validation.payload, mode);
+        applyValidatedStateSnapshot(nextState);
+        await refreshInternalStorageState();
+        showToast(
+          `Restored from "${file.name}" (${mode === 'merge' ? 'Safe Merge' : 'Full Replace'})! Pre-restore safety snapshot saved.`
+        );
       } catch {
         showToast('Invalid JSON backup file.', 'error');
       }
     };
     reader.readAsText(file);
+  };
+
+  // Separate Action 7: Push Live Real-Time Sync (or Enqueue if Offline)
+  const handlePushRealtimeSyncNow = useCallback(async () => {
+    if (isApplyingRemoteRef.current) return;
+    const snap = getCurrentSnapshot();
+    const nextMeta: SyncMetadata = {
+      deviceId: deviceIdRef.current,
+      lastSyncTimestamp: Date.now(),
+      revision: syncMetaRef.current.revision + 1,
+    };
+    syncMetaRef.current = nextMeta;
+
+    if (!navigator.onLine) {
+      setOfflineQueue((prev) =>
+        enqueueOfflineAction(prev, {
+          actionType: 'LIVE_SYNC',
+          summary: `Offline POS state sync (${snap.sales.length} bills, ${snap.medicines.length} medicines)`,
+          payload: snap,
+        })
+      );
+      setRealtimeSyncStatus('offline');
+      setRealtimeSyncDetail('Offline — Changes queued in HaryanaMedicalStore/offline_queue');
+      showToast('Offline: State queued in Offline Sync Queue for auto-sync!', 'info');
+      return;
+    }
+
+    setCloudActionBusy(true);
+    setRealtimeSyncStatus('syncing');
+    const res = await pushRealtimePharmacySync(snap, nextMeta);
+    setCloudActionBusy(false);
+
+    if (res.ok) {
+      const nowStr = new Date().toLocaleString('en-IN');
+      setLastRealtimeSyncAt(nowStr);
+      setRealtimeSyncStatus('connected');
+      setRealtimeSyncDetail(`Live Sync Pushed at ${nowStr}`);
+      showToast('Pushed live state to Firebase Real-Time Sync!');
+    } else {
+      setOfflineQueue((prev) =>
+        enqueueOfflineAction(prev, {
+          actionType: 'LIVE_SYNC',
+          summary: `Retry queued after sync error (${snap.sales.length} bills)`,
+          payload: snap,
+        })
+      );
+      setRealtimeSyncStatus('offline');
+      setRealtimeSyncDetail('Queued in Offline Sync Queue');
+      showToast('Network busy — queued in Offline Sync Queue.', 'info');
+    }
+  }, [getCurrentSnapshot, setLastRealtimeSyncAt]);
+
+  // Separate Action 8: Safe Cloud Backup (`haryana_medical_store/cloud_backup_v1`)
+  const handleCreateSafeCloudBackup = async (note?: string) => {
+    const snap = getCurrentSnapshot();
+    if (!navigator.onLine) {
+      setOfflineQueue((prev) =>
+        enqueueOfflineAction(prev, {
+          actionType: 'CLOUD_BACKUP',
+          summary: `Queued Safe Cloud Backup (${snap.medicines.length} meds, ${snap.sales.length} bills)`,
+          payload: snap,
+        })
+      );
+      showToast('Offline: Safe Cloud Backup added to Offline Queue!', 'info');
+      return;
+    }
+
+    setCloudActionBusy(true);
+    const res = await createSafeCloudBackup(snap, {
+      note: note || 'Manual Verified Cloud Backup',
+      deviceId: deviceIdRef.current,
+    });
+    const meta = await fetchCloudBackupMetadata();
+    if (meta) setCloudBackupMeta(meta);
+    setCloudActionBusy(false);
+
+    if (res.ok && res.payload) {
+      const nowStr = new Date().toLocaleString('en-IN');
+      setSettings((p) => ({ ...p, lastBackupTime: nowStr }));
+      setLastRealtimeSyncAt(nowStr);
+      showToast(
+        `Verified Safe Cloud Backup saved (${res.payload.checksum})! Previous cloud snapshot preserved.`
+      );
+    } else {
+      setOfflineQueue((prev) =>
+        enqueueOfflineAction(prev, {
+          actionType: 'CLOUD_BACKUP',
+          summary: 'Queued Cloud Backup after network error',
+          payload: snap,
+        })
+      );
+      showToast(res.error || 'Cloud backup queued in Offline Sync Queue.', 'info');
+    }
+  };
+
+  const handleRefreshCloudBackupMeta = async () => {
+    setCloudActionBusy(true);
+    const meta = await fetchCloudBackupMetadata();
+    setCloudActionBusy(false);
+    if (meta) {
+      setCloudBackupMeta(meta);
+      showToast(`Cloud Backup Verified: ${meta.checksum} (${meta.recordCounts.sales} bills)`);
+    } else {
+      showToast('No Cloud Backup found yet — click "Create Safe Cloud Backup" to create one.', 'info');
+    }
+  };
+
+  // Separate Action 9: Safe Cloud Restore (`merge` or `replace` with Pre-Restore Safety Snapshot)
+  const handleSafeCloudRestore = async (mode: 'merge' | 'replace' = 'merge') => {
+    setCloudActionBusy(true);
+    const currentSnap = getCurrentSnapshot();
+
+    // 1. Always save a Pre-Restore Safety Snapshot in Internal Storage first
+    await saveBackupToInternalStorage(
+      currentSnap,
+      'safety_snapshots',
+      `Pre-Cloud-Restore Safety Snapshot (${mode.toUpperCase()})`
+    );
+
+    // 2. Fetch and validate Cloud Backup from Firestore
+    const res = await restoreFromSafeCloudBackup('cloud_backup_v1');
+    setCloudActionBusy(false);
+
+    if (!res.ok || !res.payload) {
+      await refreshInternalStorageState();
+      showToast(res.error || 'No valid Cloud Backup found to restore.', 'error');
+      return;
+    }
+
+    const nextState = mergeBackupPayloadSafely(currentSnap, res.payload, mode);
+    applyValidatedStateSnapshot(nextState);
+    await refreshInternalStorageState();
+    showToast(
+      `Cloud Restore (${mode === 'merge' ? 'Safe Merge' : 'Full Replace'}) complete! Pre-restore safety snapshot saved in Internal Storage.`
+    );
+  };
+
+  // Separate Action 10: Flush Offline Sync Queue
+  const handleFlushOfflineQueue = useCallback(async () => {
+    if (offlineQueue.length === 0) return;
+    if (!navigator.onLine) {
+      showToast('Still offline — queue will automatically flush when internet returns.', 'info');
+      return;
+    }
+
+    setCloudActionBusy(true);
+    let currentQueue = [...offlineQueue];
+    let flushedCount = 0;
+
+    for (const item of offlineQueue) {
+      if (item.actionType === 'CLOUD_BACKUP') {
+        const res = await createSafeCloudBackup(item.payload, {
+          note: `Flushed from Offline Queue (${item.createdAt})`,
+          deviceId: deviceIdRef.current,
+        });
+        if (res.ok) {
+          currentQueue = removeQueueItem(currentQueue, item.id);
+          flushedCount++;
+        } else {
+          currentQueue = markQueueItemFailed(
+            currentQueue,
+            item.id,
+            res.error || 'Cloud backup flush failed'
+          );
+        }
+      } else {
+        const nextMeta: SyncMetadata = {
+          deviceId: deviceIdRef.current,
+          lastSyncTimestamp: Date.now(),
+          revision: syncMetaRef.current.revision + 1,
+        };
+        syncMetaRef.current = nextMeta;
+        const res = await pushRealtimePharmacySync(item.payload, nextMeta);
+        if (res.ok) {
+          currentQueue = removeQueueItem(currentQueue, item.id);
+          flushedCount++;
+        } else {
+          currentQueue = markQueueItemFailed(
+            currentQueue,
+            item.id,
+            res.error || 'Live sync flush failed'
+          );
+        }
+      }
+    }
+
+    setOfflineQueue(currentQueue);
+    setCloudActionBusy(false);
+    if (flushedCount > 0) {
+      const nowStr = new Date().toLocaleString('en-IN');
+      setLastRealtimeSyncAt(nowStr);
+      setRealtimeSyncStatus('connected');
+      setRealtimeSyncDetail(`Flushed ${flushedCount} queued offline action(s) at ${nowStr}`);
+      showToast(`Flushed ${flushedCount} queued offline operation(s) to Firebase!`);
+    }
+  }, [offlineQueue, setLastRealtimeSyncAt]);
+
+  // Auto-flush offline queue when device comes back online
+  useEffect(() => {
+    const onOnline = () => {
+      setRealtimeSyncStatus('connected');
+      if (offlineQueue.length > 0) {
+        void handleFlushOfflineQueue();
+      }
+    };
+    const onOffline = () => {
+      setRealtimeSyncStatus('offline');
+      setRealtimeSyncDetail('Offline — Queueing mutations locally');
+    };
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, [offlineQueue.length, handleFlushOfflineQueue]);
+
+  // Separate Action 11: GitHub Release Based Updater Check
+  const handleCheckGithubReleaseUpdate = async () => {
+    setCheckingGithubUpdate(true);
+    const result = await checkGitHubReleaseUpdate(githubRepoSlug, APP_CURRENT_VERSION);
+    setGithubReleaseInfo(result);
+    setCheckingGithubUpdate(false);
+
+    setUpdateState({
+      available: true,
+      downloading: false,
+      downloaded: false,
+      version: result.latestVersion || APP_CURRENT_VERSION,
+      apkDownloadUrl: result.apkAsset?.downloadUrl || '/haryana-medical-store-release.apk',
+      apkFileName: result.apkAsset?.name || 'HaryanaMedicalStore-Release.apk',
+      releaseNotes: result.releaseNotes,
+    });
+
+    if (result.hasUpdate) {
+      showToast(`New GitHub Release ${result.tagName} found! Ready to download.`);
+    } else {
+      showToast(result.message, 'info');
+    }
   };
 
   // Handle PWA Web Share Target, Custom Protocol Handler (web+haryanamed://), File Handling API, & SW Updates
@@ -1399,49 +1915,51 @@ export default function App() {
         </div>
       </header>
 
-      {/* In-App Update Banner (Never force-updates silently) */}
+      {/* In-App GitHub Release Update Banner (Never force-updates silently) */}
       {updateState.available && (
-        <div className="bg-amber-500 text-slate-950 px-4 py-2.5 shadow-xs">
+        <div
+          data-testid="github-update-banner"
+          className="bg-amber-500 text-slate-950 px-4 py-2.5 shadow-xs"
+        >
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
-            <span>
-              New App Version v{updateState.version} is ready for {settings.shopName}. Active
-              billing will not be interrupted.
-            </span>
-            <div className="flex items-center gap-2">
-              {!updateState.downloaded ? (
+            <div className="min-w-0">
+              <span>
+                GitHub Release v{updateState.version} ({updateState.apkFileName}) ready for{' '}
+                {settings.shopName}. Active billing is never interrupted.
+              </span>
+              {updateState.releaseNotes && (
+                <span className="hidden md:inline text-slate-800 ml-2 font-mono text-[11px]">
+                  — {updateState.releaseNotes.slice(0, 90)}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href={updateState.apkDownloadUrl}
+                download={updateState.apkFileName}
+                onClick={() => {
+                  setUpdateState((p) => ({ ...p, downloaded: true }));
+                  showToast(`Downloading ${updateState.apkFileName}...`);
+                }}
+                className="min-h-[38px] inline-flex items-center px-3.5 py-1.5 rounded-xl bg-slate-900 text-white font-bold cursor-pointer"
+              >
+                Download APK
+              </a>
+              {updateState.downloaded && (
                 <button
                   type="button"
                   onClick={() => {
-                    setUpdateState((p) => ({ ...p, downloading: true }));
-                    window.setTimeout(
-                      () =>
-                        setUpdateState((p) => ({
-                          ...p,
-                          downloading: false,
-                          downloaded: true,
-                        })),
-                      800
-                    );
-                  }}
-                  className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-slate-900 text-white font-bold cursor-pointer"
-                >
-                  {updateState.downloading ? 'Downloading...' : 'Download'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUpdateState({
+                    setUpdateState((p) => ({
+                      ...p,
                       available: false,
                       downloading: false,
                       downloaded: false,
-                      version: '2.5.0',
-                    });
-                    showToast('App Update v2.5.0 Installed Successfully!');
+                    }));
+                    showToast(`Release v${updateState.version} applied!`);
                   }}
                   className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-emerald-800 text-white font-bold cursor-pointer"
                 >
-                  Install Now
+                  Apply &amp; Dismiss
                 </button>
               )}
               <button
@@ -1795,16 +2313,39 @@ export default function App() {
             }}
             onLockPOS={() => setCurrentUser((prev) => ({ ...prev, loggedIn: false }))}
             openImageStudio={() => setImageStudioOpen(true)}
-            triggerUpdateBanner={() =>
-              setUpdateState({
-                available: true,
-                downloading: false,
-                downloaded: false,
-                version: '2.5.0',
-              })
-            }
+            triggerUpdateBanner={() => {
+              void handleCheckGithubReleaseUpdate();
+            }}
             onExportJSONBackup={handleExportJSONBackup}
             onImportJSONBackup={handleImportJSONBackup}
+            internalStorageHealth={internalStorageHealth}
+            internalBackups={internalBackups}
+            onSaveInternalBackup={handleSaveInternalBackup}
+            onRestoreInternalBackup={handleRestoreInternalBackup}
+            onDeleteInternalBackup={handleDeleteInternalBackup}
+            onExportInternalBackupFile={handleExportInternalBackupFile}
+            realtimeSyncEnabled={realtimeSyncEnabled}
+            setRealtimeSyncEnabled={setRealtimeSyncEnabled}
+            realtimeSyncStatus={realtimeSyncStatus}
+            realtimeSyncDetail={realtimeSyncDetail}
+            lastRealtimeSyncAt={lastRealtimeSyncAt}
+            onPushRealtimeSyncNow={handlePushRealtimeSyncNow}
+            offlineQueue={offlineQueue}
+            onFlushOfflineQueue={handleFlushOfflineQueue}
+            onClearOfflineQueue={() => {
+              setOfflineQueue([]);
+              showToast('Cleared Offline Sync Queue.', 'info');
+            }}
+            cloudBackupMeta={cloudBackupMeta}
+            cloudActionBusy={cloudActionBusy}
+            onCreateSafeCloudBackup={handleCreateSafeCloudBackup}
+            onRefreshCloudBackupMeta={handleRefreshCloudBackupMeta}
+            onSafeCloudRestore={handleSafeCloudRestore}
+            githubRepoSlug={githubRepoSlug}
+            setGithubRepoSlug={setGithubRepoSlug}
+            githubReleaseInfo={githubReleaseInfo}
+            checkingGithubUpdate={checkingGithubUpdate}
+            onCheckGithubReleaseUpdate={handleCheckGithubReleaseUpdate}
             isInstallable={isInstallable}
             isInstalled={isInstalled}
             onInstallPWA={install}
@@ -2003,18 +2544,13 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    setUpdateState({
-                      available: true,
-                      downloading: false,
-                      downloaded: false,
-                      version: '2.5.0',
-                    });
+                    void handleCheckGithubReleaseUpdate();
                     setSideDrawerOpen(false);
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  Check for In-App Updates
+                  Check GitHub for App Updates
                 </button>
                 <button
                   type="button"

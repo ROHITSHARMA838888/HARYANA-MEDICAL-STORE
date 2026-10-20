@@ -1,11 +1,12 @@
 /**
  * Haryana Medical Store — PWA Service Worker
  * Robust offline caching strategy for pharmacy POS and inventory management.
- * Offline-first design: Ensures uninterrupted billing and stock operations during network outages.
+ * Offline-first design: Ensures uninterrupted billing and stock operations during network outages,
+ * while strictly bypassing authentication, cloud database, and live API endpoints.
  */
 
 const CACHE_PREFIX = 'haryana-medical-store';
-const SW_VERSION = 'v2.6.0';
+const SW_VERSION = 'v2.9.0';
 const PRECACHE_NAME = `${CACHE_PREFIX}-precache-${SW_VERSION}`;
 const STATIC_CACHE_NAME = `${CACHE_PREFIX}-static-${SW_VERSION}`;
 const FONT_CACHE_NAME = `${CACHE_PREFIX}-fonts-${SW_VERSION}`;
@@ -21,6 +22,8 @@ const PRECACHE_ASSETS = [
   '/pwa-512x512.png',
   '/pwa-maskable-512x512.png',
   '/apple-touch-icon.png',
+  '/screenshot-wide.png',
+  '/screenshot-narrow.png',
 ];
 
 // Install Event: Pre-cache core application shell
@@ -32,7 +35,6 @@ self.addEventListener('install', (event) => {
         return cache.addAll(PRECACHE_ASSETS);
       })
       .then(() => {
-        // Activate worker promptly
         return self.skipWaiting();
       })
       .catch((err) => {
@@ -104,7 +106,26 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Strategy 1: Google Fonts (Cache-First with 1-year persistence)
+  // Ignore non-HTTP/HTTPS schemes (e.g. chrome-extension://, data:, blob:)
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return;
+  }
+
+  // Strictly bypass API routes, Firebase Auth/Firestore, GitHub API, and large APK binaries
+  const isSensitiveOrLiveApi =
+    url.pathname.startsWith('/api/') ||
+    url.pathname.endsWith('.apk') ||
+    url.hostname.includes('firestore.googleapis.com') ||
+    url.hostname.includes('identitytoolkit.googleapis.com') ||
+    url.hostname.includes('securetoken.googleapis.com') ||
+    url.hostname.includes('api.github.com') ||
+    url.hostname.includes('github.com');
+
+  if (isSensitiveOrLiveApi) {
+    return;
+  }
+
+  // Strategy 1: Google Fonts (Cache-First with persistence)
   if (
     url.hostname === 'fonts.googleapis.com' ||
     url.hostname === 'fonts.gstatic.com'
@@ -115,19 +136,23 @@ self.addEventListener('fetch', (event) => {
           if (cachedResponse) {
             return cachedResponse;
           }
-          return fetch(request).then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              cache.put(request, networkResponse.clone());
-            }
-            return networkResponse;
-          });
+          return fetch(request)
+            .then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200) {
+                cache.put(request, networkResponse.clone());
+              }
+              return networkResponse;
+            })
+            .catch(() => {
+              return new Response('', { status: 503, statusText: 'Offline' });
+            });
         });
       })
     );
     return;
   }
 
-  // Strategy 2: Navigation requests (HTML documents)
+  // Strategy 2: Navigation requests (HTML documents, including ?tab=..., ?share_text=..., ?lookup=...)
   // Network-First with quick timeout (1.5s) falling back to cached /index.html
   if (request.mode === 'navigate') {
     event.respondWith(
@@ -136,42 +161,81 @@ self.addEventListener('fetch', (event) => {
           if (networkResponse && networkResponse.status === 200) {
             const responseClone = networkResponse.clone();
             caches.open(PRECACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
+              cache.put('/index.html', responseClone);
             });
             return networkResponse;
           }
-          return (
-            caches.match(request) ||
-            caches.match('/index.html') ||
-            caches.match('/')
-          );
+          return caches
+            .match('/index.html')
+            .then((res) => res || caches.match('/'))
+            .then(
+              (res) =>
+                res ||
+                new Response('Offline — Haryana Medical Store POS', {
+                  status: 503,
+                  headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+                })
+            );
         })
         .catch(() => {
           return caches
             .match(request)
             .then((res) => res || caches.match('/index.html'))
-            .then((res) => res || caches.match('/'));
+            .then((res) => res || caches.match('/'))
+            .then(
+              (res) =>
+                res ||
+                new Response('Offline — Haryana Medical Store POS', {
+                  status: 503,
+                  headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+                })
+            );
         })
     );
     return;
   }
 
-  // Strategy 3: Static Assets (JS, CSS, Images, Icons, Manifest)
+  // Strategy 2b: Vite source modules (/src/, /node_modules/) - Network-First with cache fallback
+  if (
+    url.origin === self.location.origin &&
+    (url.pathname.startsWith('/src/') || url.pathname.startsWith('/node_modules/'))
+  ) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(STATIC_CACHE_NAME).then((cache) => {
+              cache.put(request, responseClone);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(request).then(
+            (res) => res || new Response('', { status: 503, statusText: 'Offline' })
+          );
+        })
+    );
+    return;
+  }
+
+  // Strategy 3: Same-origin Static Assets (Production hashed JS/CSS, Images, Icons, Manifest)
   // Stale-While-Revalidate: serve from cache immediately, update in background
   const isStaticAsset =
-    url.pathname.startsWith('/assets/') ||
-    url.pathname.startsWith('/src/') ||
-    url.pathname.endsWith('.js') ||
-    url.pathname.endsWith('.css') ||
-    url.pathname.endsWith('.svg') ||
-    url.pathname.endsWith('.png') ||
-    url.pathname.endsWith('.jpg') ||
-    url.pathname.endsWith('.jpeg') ||
-    url.pathname.endsWith('.webp') ||
-    url.pathname.endsWith('.ico') ||
-    url.pathname.endsWith('.json') ||
-    url.pathname.endsWith('.woff') ||
-    url.pathname.endsWith('.woff2');
+    url.origin === self.location.origin &&
+    (url.pathname.startsWith('/assets/') ||
+      url.pathname.endsWith('.js') ||
+      url.pathname.endsWith('.css') ||
+      url.pathname.endsWith('.svg') ||
+      url.pathname.endsWith('.png') ||
+      url.pathname.endsWith('.jpg') ||
+      url.pathname.endsWith('.jpeg') ||
+      url.pathname.endsWith('.webp') ||
+      url.pathname.endsWith('.ico') ||
+      url.pathname.endsWith('.json') ||
+      url.pathname.endsWith('.woff') ||
+      url.pathname.endsWith('.woff2'));
 
   if (isStaticAsset) {
     event.respondWith(
@@ -187,8 +251,10 @@ self.addEventListener('fetch', (event) => {
             return networkResponse;
           })
           .catch(() => {
-            // Network failed; cachedResponse will handle it
-            return cachedResponse;
+            return (
+              cachedResponse ||
+              new Response('', { status: 503, statusText: 'Offline' })
+            );
           });
 
         return cachedResponse || fetchPromise;
@@ -197,27 +263,31 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Strategy 4: All other GET requests
-  // Network-First with fallback to dynamic cache
-  event.respondWith(
-    fetch(request)
-      .then((networkResponse) => {
-        if (
-          networkResponse &&
-          networkResponse.status === 200 &&
-          networkResponse.type === 'basic'
-        ) {
-          const responseClone = networkResponse.clone();
-          caches.open(DYNAMIC_CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
-        }
-        return networkResponse;
-      })
-      .catch(() => {
-        return caches.match(request);
-      })
-  );
+  // Strategy 4: Same-origin other GET requests
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (
+            networkResponse &&
+            networkResponse.status === 200 &&
+            networkResponse.type === 'basic'
+          ) {
+            const responseClone = networkResponse.clone();
+            caches.open(DYNAMIC_CACHE_NAME).then((cache) => {
+              cache.put(request, responseClone);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(request).then(
+            (res) =>
+              res || new Response('', { status: 503, statusText: 'Offline' })
+          );
+        })
+    );
+  }
 });
 
 /**

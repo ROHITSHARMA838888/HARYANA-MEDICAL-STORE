@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isValidPharmacyDoc(data) {
+      return data is map
+        && data.keys().hasAll(['lastCloudSync'])
+        && data.lastCloudSync is string
+        && data.lastCloudSync.size() <= 64
+        && (!('shopId' in data) || (data.shopId is string && data.shopId.size() <= 128))
+        && (!('deviceId' in data) || (data.deviceId is string && data.deviceId.size() <= 128))
+        && (!('version' in data) || (data.version is string && data.version.size() <= 32))
+        && (!('checksum' in data) || (data.checksum is string && data.checksum.size() <= 64))
+        && (!('note' in data) || (data.note is string && data.note.size() <= 256))
+        && (!('source' in data) || (data.source is string && data.source.size() <= 64))
+        && (!('exportedAt' in data) || (data.exportedAt is string && data.exportedAt.size() <= 64))
+        && (!('lastSyncTimestamp' in data) || data.lastSyncTimestamp is number)
+        && (!('revision' in data) || data.revision is number)
+        && (!('recordCounts' in data) || data.recordCounts is map)
+        && (!('settings' in data) || data.settings is map)
+        && (!('medicines' in data) || (data.medicines is list && data.medicines.size() <= 5000))
+        && (!('batches' in data) || (data.batches is list && data.batches.size() <= 10000))
+        && (!('suppliers' in data) || (data.suppliers is list && data.suppliers.size() <= 2000))
+        && (!('customers' in data) || (data.customers is list && data.customers.size() <= 5000))
+        && (!('sales' in data) || (data.sales is list && data.sales.size() <= 10000))
+        && (!('purchases' in data) || (data.purchases is list && data.purchases.size() <= 5000))
+        && (!('purchaseReturns' in data) || (data.purchaseReturns is list && data.purchaseReturns.size() <= 2000))
+        && (!('saleReturns' in data) || (data.saleReturns is list && data.saleReturns.size() <= 2000))
+        && (!('stockMovements' in data) || (data.stockMovements is list && data.stockMovements.size() <= 10000))
+        && (!('deletedItems' in data) || (data.deletedItems is list && data.deletedItems.size() <= 2000));
+    }
+
+    // Connection health check endpoint
+    match /test/{docId} {
+      allow get: if isValidId(docId);
+    }
+
+    // Haryana Medical Store Cloud Backup & Real-Time Sync Documents
+    match /haryana_medical_store/{docId} {
+      allow get: if isValidId(docId);
+      allow create, update: if isValidId(docId) && isValidPharmacyDoc(incoming());
+    }
+  }
+}

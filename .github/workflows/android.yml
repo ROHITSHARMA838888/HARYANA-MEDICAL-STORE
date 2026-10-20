@@ -41,11 +41,12 @@ jobs:
       - name: Build APK with versionCode
         run: |
           cd android
-          ./gradlew assembleDebug -PversionCode=${{ github.run_number }} -PversionName=1.0.${{ github.run_number }}
+          ./gradlew assembleDebug -PversionCode=${{ github.run_number }} -PversionName=2.8.${{ github.run_number }}
 
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: Build ${{ github.run_number }}
+          tag_name: v2.8.${{ github.run_number }}
+          name: Haryana Medical Store v2.8.${{ github.run_number }}
+          body: "Automated Android APK release for Haryana Medical Store POS (Build #${{ github.run_number }}): Internal Storage Folder, Firebase Real-Time Sync, Offline Queue, and Safe Cloud Backup/Restore."
           files: android/app/build/outputs/apk/debug/app-debug.apk
